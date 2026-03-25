@@ -21,6 +21,8 @@ export const translations = {
       trainees: 'Trainees',
       payments: 'Payments',
       program: 'Program',
+      plans: 'Plans',
+      history: 'Max tests',
       exercises: 'Exercises',
       terminology: 'Terminology',
       schedule: 'Schedule',
@@ -202,6 +204,8 @@ export const translations = {
       paymentsTitle: 'Payments done',
       paymentsSubtitle: 'Monthly payment history.',
       paymentsEmpty: 'No payment history yet.',
+      feedbackSubtitle: 'Latest feedback and coach replies for this trainee.',
+      feedbackEmpty: 'No feedback for this trainee yet.',
       completedLogTitle: 'Completed exercise log',
       completedLogSubtitle:
         'Review the most recent completed exercises and notes in time order.',
@@ -242,6 +246,11 @@ export const translations = {
     },
     trainees: {
       badge: 'trainee',
+      createSubtitle: 'Add a new trainee record directly from admin.',
+      namePlaceholder: 'Full name',
+      weightPlaceholder: 'Weight in kg',
+      createAction: 'Add trainee',
+      createSaving: 'Creating trainee…',
     },
     trainers: {
       title: 'Trainers',
@@ -318,6 +327,9 @@ export const translations = {
     },
     errors: {
       loadTrainees: 'Failed to load trainees: {message}',
+      traineeNameRequired: 'Trainee name is required.',
+      traineeWeightInvalid: 'Weight must be greater than 0.',
+      createTrainee: 'Failed to create trainee.',
       updatePayment: 'Failed to update payment status.',
       loadAccess: 'Failed to load admin access: {message}',
       loadTrainers: 'Failed to load trainers: {message}',
@@ -363,6 +375,8 @@ export const translations = {
       maxTestValueInvalid: 'Value must be greater than 0.',
       maxTestUnitRequired: 'Unit is required.',
       addMaxTest: 'Failed to add max test.',
+      coachTipUnavailable:
+        'Coach tips are only available for trainer accounts.',
       updateCoachTip: 'Failed to update coach tip.',
       updateTrainerNotes: 'Failed to update trainer notes.',
       updateFeedback: 'Failed to update feedback.',
@@ -416,6 +430,8 @@ export const translations = {
       trainees: 'Allievi',
       payments: 'Pagamenti',
       program: 'Programma',
+      plans: 'Piani',
+      history: 'Massimali',
       exercises: 'Esercizi',
       terminology: 'Terminologia',
       schedule: 'Programma',
@@ -598,6 +614,8 @@ export const translations = {
       paymentsTitle: 'Pagamenti effettuati',
       paymentsSubtitle: 'Storico pagamenti mensili.',
       paymentsEmpty: 'Nessuno storico pagamenti disponibile.',
+      feedbackSubtitle: 'Ultimi feedback e risposte coach per questo allievo.',
+      feedbackEmpty: 'Nessun feedback per questo allievo.',
       completedLogTitle: 'Registro esercizi completati',
       completedLogSubtitle:
         'Controlla gli esercizi completati più recenti e le note in ordine temporale.',
@@ -638,6 +656,11 @@ export const translations = {
     },
     trainees: {
       badge: 'allievo',
+      createSubtitle: 'Aggiungi un nuovo allievo direttamente da admin.',
+      namePlaceholder: 'Nome e cognome',
+      weightPlaceholder: 'Peso in kg',
+      createAction: 'Aggiungi allievo',
+      createSaving: 'Creazione allievo…',
     },
     trainers: {
       title: 'Trainer',
@@ -714,6 +737,9 @@ export const translations = {
     },
     errors: {
       loadTrainees: 'Errore caricamento allievi: {message}',
+      traineeNameRequired: "Il nome dell'allievo è obbligatorio.",
+      traineeWeightInvalid: 'Il peso deve essere maggiore di 0.',
+      createTrainee: 'Impossibile creare l’allievo.',
       updatePayment: 'Impossibile aggiornare il pagamento.',
       loadAccess: 'Errore caricamento accesso admin: {message}',
       loadTrainers: 'Errore caricamento trainer: {message}',
@@ -759,6 +785,8 @@ export const translations = {
       maxTestValueInvalid: 'Il valore deve essere maggiore di 0.',
       maxTestUnitRequired: "L'unità è obbligatoria.",
       addMaxTest: 'Impossibile aggiungere il test massimale.',
+      coachTipUnavailable:
+        'Il consiglio coach è disponibile solo per account trainer.',
       updateCoachTip: 'Impossibile aggiornare il consiglio del coach.',
       updateTrainerNotes: 'Impossibile aggiornare le note del coach.',
       updateFeedback: 'Impossibile aggiornare il feedback.',

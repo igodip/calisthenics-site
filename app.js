@@ -54,6 +54,8 @@ import {
       const hasBootstrapped = ref(false);
       const email = ref('');
       const password = ref('');
+      const authLoading = ref(false);
+      const authError = ref('');
       const search = ref('');
       const activeSection = ref('dashboard');
       const paymentFilter = ref('all');
@@ -90,6 +92,11 @@ import {
       const terminologyError = ref('');
 
       const users = ref([]);
+      const traineeForm = ref({
+        name: '',
+        weight: '',
+      });
+      const creatingTrainee = ref(false);
       const current = ref(null);
       const days = ref([]);
       const plans = ref([]);
@@ -131,6 +138,8 @@ import {
         series: [],
         maxValue: 0,
         axisTicks: [],
+        xTicks: [],
+        baselineY: 0,
       });
       const paymentTrendsLoading = ref(false);
       const paymentTrendsError = ref('');
@@ -154,6 +163,9 @@ import {
         dates: [],
         lines: [],
         maxValue: 0,
+        axisTicks: [],
+        xTicks: [],
+        baselineY: 0,
         minDateLabel: '',
         maxDateLabel: '',
       });
@@ -229,6 +241,12 @@ import {
         if (nextSection === 'feedback') {
           if (feedbackLoading.value || feedbackEntries.value.length) return;
           await loadFeedbackEntries();
+        }
+        if (nextSection === 'history' && current.value && !maxTests.value.length) {
+          await loadMaxTests(current.value);
+        }
+        if (nextSection === 'plans' && current.value && !plans.value.length) {
+          await Promise.all([loadPlans(current.value), loadDays(current.value)]);
         }
       });
 
@@ -541,6 +559,13 @@ import {
           .map((day) => {
             const exercises = day.day_exercises || [];
             const completedCount = exercises.filter((ex) => ex.completed).length;
+            const dayNotes = (day.notes || '').trim();
+            const trainerExerciseNotes = exercises
+              .map((exercise) => (exercise.notes || '').trim())
+              .filter(Boolean);
+            const traineeFeedback = exercises
+              .map((exercise) => (exercise.trainee_notes || '').trim())
+              .filter(Boolean);
             return {
               id: day.id,
               week: Number(day.week || 0),
@@ -548,6 +573,10 @@ import {
               total: exercises.length,
               completed: completedCount,
               trained: completedCount > 0,
+              notes: dayNotes,
+              trainerExerciseNotes,
+              traineeFeedback,
+              completedAtLabel: day.completed_at ? formatDateTime(day.completed_at) : '',
               label: formatWeekDayTitleLabel(
                 day.week || 1,
                 day.day_code?.toUpperCase(),
@@ -753,6 +782,13 @@ import {
         }),
       );
 
+      const currentFeedbackEntries = computed(() => {
+        if (!current.value?.id) return [];
+        return (feedbackEntries.value || [])
+          .filter((entry) => entry.traineeId === current.value.id)
+          .slice(0, 6);
+      });
+
       const lastWeekTrainees = computed(() => {
         const statusMap = traineeWeekStatus.value || {};
         return (filteredUsers.value || [])
@@ -937,6 +973,87 @@ import {
           month: 'short',
           year: 'numeric',
         });
+      };
+
+      const formatShortDateLabel = (value) => {
+        if (!value) return '';
+        const parsed = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(parsed.valueOf())) return '';
+        const localeTag = locale.value === 'it' ? 'it-IT' : 'en-US';
+        return parsed.toLocaleDateString(localeTag, {
+          month: 'short',
+          day: 'numeric',
+        });
+      };
+
+      const buildAreaPath = (points, baselineY) => {
+        if (!points.length) return '';
+        const start = points[0];
+        const end = points[points.length - 1];
+        return [
+          `M ${start.x} ${baselineY}`,
+          `L ${start.x} ${start.y}`,
+          ...points.slice(1).map((point) => `L ${point.x} ${point.y}`),
+          `L ${end.x} ${baselineY}`,
+          'Z',
+        ].join(' ');
+      };
+
+      const buildAxisTicks = ({
+        maxValue,
+        chartHeight,
+        padding,
+        tickCount = 4,
+        formatter,
+      }) => {
+        const range = maxValue || 1;
+        return Array.from({ length: tickCount }, (_, index) => {
+          const ratio = tickCount === 1 ? 0 : index / (tickCount - 1);
+          const value = maxValue * (1 - ratio);
+          const y =
+            chartHeight - padding - (value / range) * (chartHeight - padding * 2);
+          return {
+            value,
+            y: Number(y.toFixed(2)),
+            label: formatter(value),
+          };
+        });
+      };
+
+      const buildXAxisTicks = ({
+        items,
+        chartWidth,
+        padding,
+        formatter,
+        maxTicks = 4,
+      }) => {
+        if (!items.length) return [];
+        if (items.length === 1) {
+          return [
+            {
+              x: chartWidth / 2,
+              label: formatter(items[0]),
+            },
+          ];
+        }
+        const limit = Math.max(2, Math.min(maxTicks, items.length));
+        const indexes = new Set([0, items.length - 1]);
+        if (limit > 2) {
+          const step = (items.length - 1) / (limit - 1);
+          for (let i = 1; i < limit - 1; i += 1) {
+            indexes.add(Math.round(step * i));
+          }
+        }
+        return Array.from(indexes)
+          .sort((a, b) => a - b)
+          .map((index) => ({
+            x:
+              items.length === 1
+                ? chartWidth / 2
+                : padding +
+                  (index / (items.length - 1)) * (chartWidth - padding * 2),
+            label: formatter(items[index]),
+          }));
       };
 
       const normalizePaymentAmount = (value) => {
@@ -1327,17 +1444,25 @@ import {
       }
 
       async function emailPasswordSignIn() {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.value,
-          password: password.value,
-        });
-        if (error) {
-          alert(error.message);
-          return;
+        if (authLoading.value) return;
+        authLoading.value = true;
+        authError.value = '';
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.value.trim(),
+            password: password.value,
+          });
+          if (error) {
+            throw error;
+          }
+          session.value = data.session;
+          user.value = data.user;
+          await bootstrap();
+        } catch (error) {
+          authError.value = error.message || 'Sign in failed';
+        } finally {
+          authLoading.value = false;
         }
-        session.value = data.session;
-        user.value = data.user;
-        await bootstrap();
       }
       async function signOut() {
         await supabase.auth.signOut();
@@ -1355,12 +1480,12 @@ import {
         await loadTraineeProgress();
         await loadDashboardBurndown();
         await loadDashboardNotes();
+        await loadFeedbackEntries();
         if (users.value.length) {
           await selectUser(users.value[0]);
           await loadPlans(users.value[0]);
           await loadDays(users.value[0]);
           await loadPaymentHistory(users.value[0]);
-          await loadCompletedExercises(users.value[0]);
         }
         hasBootstrapped.value = true;
       }
@@ -1406,6 +1531,55 @@ import {
           return;
         }
         trainers.value = data || [];
+      }
+
+      async function createTrainee() {
+        if (creatingTrainee.value) return;
+        const name = (traineeForm.value.name || '').trim();
+        if (!name) {
+          alert(t('errors.traineeNameRequired'));
+          return;
+        }
+        const rawWeight = traineeForm.value.weight;
+        const normalizedWeight =
+          rawWeight === '' || rawWeight === null || rawWeight === undefined
+            ? null
+            : Number(rawWeight);
+        if (
+          normalizedWeight !== null &&
+          (!Number.isFinite(normalizedWeight) || normalizedWeight <= 0)
+        ) {
+          alert(t('errors.traineeWeightInvalid'));
+          return;
+        }
+        creatingTrainee.value = true;
+        try {
+          const { data, error } = await supabase
+            .from('trainees')
+            .insert({
+              name,
+              weight: normalizedWeight,
+            })
+            .select('id, name, weight')
+            .single();
+          if (error) {
+            throw new Error(error.message);
+          }
+          traineeForm.value = {
+            name: '',
+            weight: '',
+          };
+          await loadUsers();
+          const created = (users.value || []).find((entry) => entry.id === data?.id);
+          if (created) {
+            await openTrainee(created);
+          }
+        } catch (error) {
+          console.error(error);
+          alert(error.message || t('errors.createTrainee'));
+        } finally {
+          creatingTrainee.value = false;
+        }
       }
 
       function setExerciseEdit(exercise) {
@@ -1902,6 +2076,8 @@ import {
               series: [],
               maxValue: 0,
               axisTicks: [],
+              xTicks: [],
+              baselineY: 0,
             };
             return;
           }
@@ -1941,7 +2117,8 @@ import {
 
           const chartWidth = paymentTrends.value.chartWidth;
           const chartHeight = paymentTrends.value.chartHeight;
-          const padding = 28;
+          const padding = 44;
+          const baselineY = chartHeight - padding;
           const seriesConfig = [
             {
               key: 'received',
@@ -1968,18 +2145,17 @@ import {
             ]),
           );
           const range = maxValue || 1;
-          const axisTicks = Array.from({ length: 4 }, (_, index) => {
-            const ratio = index / 3;
-            const value = maxValue * (1 - ratio);
-            const y =
-              chartHeight -
-              padding -
-              (value / range) * (chartHeight - padding * 2);
-            return {
-              value,
-              y: Number(y.toFixed(2)),
-              label: formatAmount(value),
-            };
+          const axisTicks = buildAxisTicks({
+            maxValue,
+            chartHeight,
+            padding,
+            formatter: formatAmount,
+          });
+          const xTicks = buildXAxisTicks({
+            items: months,
+            chartWidth,
+            padding,
+            formatter: formatMonthLabel,
           });
           const pointsBySeries = seriesConfig.map((series) => {
             const points = months.map((month, index) => {
@@ -2002,12 +2178,15 @@ import {
                 x: Number(x.toFixed(2)),
                 y: Number(y.toFixed(2)),
                 value,
+                label: formatMonthLabel(month),
               };
             });
             return {
               ...series,
               points,
               polyline: points.map((point) => `${point.x},${point.y}`).join(' '),
+              areaPath: buildAreaPath(points, baselineY),
+              lastPoint: points[points.length - 1] || null,
             };
           });
 
@@ -2018,6 +2197,8 @@ import {
             series: pointsBySeries,
             maxValue,
             axisTicks,
+            xTicks,
+            baselineY,
           };
         } catch (err) {
           console.error(err);
@@ -2027,6 +2208,8 @@ import {
             series: [],
             maxValue: 0,
             axisTicks: [],
+            xTicks: [],
+            baselineY: 0,
           };
           paymentTrendsError.value =
             err.message || t('errors.loadPayments');
@@ -2202,8 +2385,6 @@ import {
           unit: 'reps',
           recorded_at: '',
         };
-        completedExercises.value = [];
-        completedExercisesError.value = '';
         paymentHistory.value = [];
         paymentsError.value = '';
         coachTipDraft.value = u?.coach_tip || '';
@@ -2219,7 +2400,7 @@ import {
           loadDays(u),
           loadPlans(u),
           loadPaymentHistory(u),
-          loadCompletedExercises(u),
+          loadFeedbackEntries(),
         ]);
       }
 
@@ -2467,13 +2648,13 @@ import {
         const { data, error } = await supabase
           .from('days')
           .select(`
-                id, week, day_code, title, notes,
+                id, week, day_code, title, notes, completed_at,
                 workout_plan_days!inner (
                   id, position,
                   workout_plans ( id, title, starts_on, created_at )
                 ),
                 day_exercises (
-                  id, position, notes, completed, exercise, exercise_id, duration_minutes
+                  id, position, notes, trainee_notes, completed, exercise, exercise_id, duration_minutes
                 )
               `)
           .eq('workout_plan_days.workout_plans.trainee_id', u.id)
@@ -2549,6 +2730,10 @@ import {
       async function saveCoachTip() {
         if (!current.value) {
           alert(t('errors.selectTrainee'));
+          return;
+        }
+        if (!currentTrainer.value?.id) {
+          alert(t('errors.coachTipUnavailable'));
           return;
         }
         coachTipSaving.value = true;
@@ -2778,6 +2963,7 @@ import {
           }
           feedbackEntries.value = (data || []).map((row) => ({
             id: row.id,
+            traineeId: row.trainee_id,
             message: row.message || '',
             traineeName: row.trainees?.name || shortId(row.trainee_id),
             statusLabel: row.read_at
@@ -2936,6 +3122,9 @@ import {
               dates: [],
               lines: [],
               maxValue: 0,
+              axisTicks: [],
+              xTicks: [],
+              baselineY: 0,
               minDateLabel: '',
               maxDateLabel: '',
             };
@@ -2944,6 +3133,17 @@ import {
 
           const traineeIds = trainees.map((u) => u.id).filter(Boolean);
           if (!traineeIds.length) {
+            dashboardBurndown.value = {
+              ...dashboardBurndown.value,
+              dates: [],
+              lines: [],
+              maxValue: 0,
+              axisTicks: [],
+              xTicks: [],
+              baselineY: 0,
+              minDateLabel: '',
+              maxDateLabel: '',
+            };
             return;
           }
 
@@ -2978,6 +3178,9 @@ import {
               dates: [],
               lines: [],
               maxValue: 0,
+              axisTicks: [],
+              xTicks: [],
+              baselineY: 0,
               minDateLabel: '',
               maxDateLabel: '',
             };
@@ -3024,7 +3227,8 @@ import {
 
           const chartWidth = dashboardBurndown.value.chartWidth;
           const chartHeight = dashboardBurndown.value.chartHeight;
-          const padding = 28;
+          const padding = 44;
+          const baselineY = chartHeight - padding;
           const colors = [
             '#2563eb',
             '#16a34a',
@@ -3036,48 +3240,73 @@ import {
             '#65a30d',
           ];
 
-          const lines = [];
-          let maxValue = 0;
+          const lineSeeds = [];
           trainees.forEach((trainee, index) => {
             const planEntry = latestPlanByTrainee.get(trainee.id);
             if (!planEntry?.planId) return;
             const planId = planEntry.planId;
             const total = totalByPlan.get(planId) || 0;
             if (!total) return;
-            const startingCompleted = completedBeforeStart.get(planId) || 0;
-            const planDates = completedByPlanDate.get(planId) || new Map();
-            let completedCount = startingCompleted;
-            const points = dates.map((dateItem, dayIndex) => {
-              const key = dateKey(dateItem);
-              completedCount += planDates.get(key) || 0;
-              const remaining = Math.max(total - completedCount, 0);
-              const x =
-                dates.length === 1
-                  ? padding
-                  : padding +
-                    (dayIndex / (dates.length - 1)) *
-                      (chartWidth - padding * 2);
-              const yRange = chartHeight - padding * 2;
-              const y =
-                chartHeight -
-                padding -
-                (remaining / total) * yRange;
-              return {
-                x: Number(x.toFixed(2)),
-                y: Number(y.toFixed(2)),
-                remaining,
-              };
-            });
-            maxValue = Math.max(maxValue, total);
-            lines.push({
+            lineSeeds.push({
               traineeId: trainee.id,
               traineeName: trainee.displayName || shortId(trainee.id),
               color: colors[index % colors.length],
               total,
-              latestRemaining: points.length ? points[points.length - 1].remaining : total,
+              startingCompleted: completedBeforeStart.get(planId) || 0,
+              planDates: completedByPlanDate.get(planId) || new Map(),
+            });
+          });
+          const maxValue = Math.max(
+            0,
+            ...lineSeeds.map((line) => Number(line.total || 0)),
+          );
+          const range = maxValue || 1;
+          const axisTicks = buildAxisTicks({
+            maxValue,
+            chartHeight,
+            padding,
+            formatter: (value) => formatTestValue(Math.round(value)),
+          });
+          const xTicks = buildXAxisTicks({
+            items: dates,
+            chartWidth,
+            padding,
+            formatter: formatShortDateLabel,
+          });
+          const lines = lineSeeds.map((line) => {
+            let completedCount = line.startingCompleted;
+            const points = dates.map((dateItem, dayIndex) => {
+              const key = dateKey(dateItem);
+              completedCount += line.planDates.get(key) || 0;
+              const remaining = Math.max(line.total - completedCount, 0);
+              const x =
+                dates.length === 1
+                  ? chartWidth / 2
+                  : padding +
+                    (dayIndex / (dates.length - 1)) *
+                      (chartWidth - padding * 2);
+              const y =
+                chartHeight -
+                padding -
+                (remaining / range) * (chartHeight - padding * 2);
+              return {
+                x: Number(x.toFixed(2)),
+                y: Number(y.toFixed(2)),
+                remaining,
+                label: formatShortDateLabel(dateItem),
+              };
+            });
+            return {
+              traineeId: line.traineeId,
+              traineeName: line.traineeName,
+              color: line.color,
+              total: line.total,
+              latestRemaining: points.length ? points[points.length - 1].remaining : line.total,
               points,
               polyline: points.map((point) => `${point.x},${point.y}`).join(' '),
-            });
+              areaPath: buildAreaPath(points, baselineY),
+              lastPoint: points[points.length - 1] || null,
+            };
           });
 
           const minDateLabel = dates.length ? formatDate(dates[0]) : '';
@@ -3091,6 +3320,9 @@ import {
             dates,
             lines,
             maxValue,
+            axisTicks,
+            xTicks,
+            baselineY,
             minDateLabel,
             maxDateLabel,
           };
@@ -3425,6 +3657,8 @@ import {
         user,
         email,
         password,
+        authLoading,
+        authError,
         search,
         activeSection,
         locale,
@@ -3432,8 +3666,11 @@ import {
         t,
         roleLabel,
         users,
+        traineeForm,
+        creatingTrainee,
         filteredUsers,
         dashboardTrainees,
+        currentFeedbackEntries,
         showLastWeekCard,
         lastWeekTrainees,
         overdueUsers,
@@ -3577,6 +3814,7 @@ import {
         signOut,
         selectUser,
         openTrainee,
+        createTrainee,
         loadDays,
         loadMaxTests,
         loadPlans,
