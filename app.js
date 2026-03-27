@@ -27,7 +27,9 @@ import {
   createApp({
     setup() {
       const storedLocale = localStorage.getItem('adminLocale');
+      const storedTheme = localStorage.getItem('adminTheme');
       const locale = ref(storedLocale || fallbackLocale);
+      const theme = ref(storedTheme || 'light');
       const {
         t,
         formatCount,
@@ -37,6 +39,10 @@ import {
         formatWeekDayTitleLabel,
         updateDocumentLanguage,
       } = createI18n(locale);
+
+      const applyDocumentTheme = () => {
+        document.documentElement.dataset.theme = theme.value === 'dark' ? 'dark' : 'light';
+      };
 
       watch(locale, async (nextLocale) => {
         localStorage.setItem('adminLocale', nextLocale);
@@ -48,6 +54,10 @@ import {
             await loadFeedbackEntries();
           }
         }
+      });
+      watch(theme, (nextTheme) => {
+        localStorage.setItem('adminTheme', nextTheme);
+        applyDocumentTheme();
       });
       const session = ref(null);
       const user = ref(null);
@@ -62,8 +72,17 @@ import {
       const currentAdmin = ref(null);
       const currentTrainer = ref(null);
       const trainers = ref([]);
+      const trainerForm = ref({
+        id: '',
+        name: '',
+      });
+      const trainerEdits = ref({});
       const trainerSelections = ref({});
       const trainerAssignmentSaving = ref({});
+      const trainerSaving = ref({});
+      const creatingTrainer = ref(false);
+      const loadingTrainers = ref(false);
+      const trainerDirectoryError = ref('');
       const exercises = ref([]);
       const exerciseFilter = ref('');
       const exerciseForm = ref({
@@ -208,6 +227,9 @@ import {
       const selectedTemplateDay = ref(0);
       const selectedTemplateSlot = ref(0);
       const savingTemplatePlan = ref(false);
+      const pdfImportLoading = ref(false);
+      const pdfImportError = ref('');
+      const pdfImportSummary = ref('');
       watch(
         [templateDayCount, templateWeekCount, templateSlotCount],
         ([nextCount, nextWeeks, nextSlots]) => {
@@ -623,6 +645,16 @@ import {
       const canAssignTrainers = computed(() =>
         Boolean(currentAdmin.value?.can_assign_trainers),
       );
+
+      const filteredTrainers = computed(() => {
+        const query = (search.value || '').trim().toLowerCase();
+        if (!query) return trainers.value || [];
+        return (trainers.value || []).filter((trainer) => {
+          const name = (trainer.name || '').toLowerCase();
+          const id = (trainer.id || '').toLowerCase();
+          return name.includes(query) || id.includes(query);
+        });
+      });
 
       const roleLabel = computed(() => {
         if (currentAdmin.value) return t('toolbar.roleAdmin');
@@ -1095,6 +1127,55 @@ import {
         return (slot.exercise || '').trim();
       };
 
+      const hasDayExerciseContent = (input = {}) => {
+        const exerciseId = (input.exercise_id || '').trim();
+        const exerciseName = (input.exercise || '').trim();
+        const notes = (input.notes || '').trim();
+        const duration = input.duration_minutes;
+        return !!(
+          exerciseId ||
+          exerciseName ||
+          notes ||
+          !(duration === undefined || duration === null || duration === '')
+        );
+      };
+
+      const normalizeDayExerciseReference = (
+        input = {},
+        catalog = exercises.value || [],
+      ) => {
+        const exerciseId = (input.exercise_id || '').trim();
+        const exerciseName = (input.exercise || '').trim();
+        if (exerciseId) {
+          const record =
+            catalog.find((exercise) => exercise?.id === exerciseId) || null;
+          if (!record) {
+            return { unresolved: exerciseId };
+          }
+          return {
+            exercise_id: record.id,
+            exercise: record.name || record.slug || exerciseName || null,
+            unresolved: '',
+          };
+        }
+        if (!exerciseName) {
+          return { exercise_id: null, exercise: null, unresolved: '' };
+        }
+        const resolved = resolveExerciseReferenceFromList(exerciseName, catalog);
+        if (resolved) {
+          return {
+            exercise_id: resolved.id,
+            exercise: resolved.name || exerciseName,
+            unresolved: '',
+          };
+        }
+        return {
+          exercise_id: null,
+          exercise: exerciseName,
+          unresolved: '',
+        };
+      };
+
       const getExerciseById = (id) => {
         if (!id) return null;
         return (exercises.value || []).find((exercise) => exercise.id === id) || null;
@@ -1122,6 +1203,463 @@ import {
         });
         return groups;
       });
+
+      const normalizePdfText = (value) =>
+        (value || '')
+          .replace(/\s+/g, ' ')
+          .replace(/\u2019/g, "'")
+          .trim();
+
+      const isProgrammingValue = (value) => {
+        const text = normalizePdfText(value).toLowerCase();
+        if (!text) return false;
+        return (
+          /\d/.test(text) ||
+          text.includes('amrap') ||
+          text.includes('emom') ||
+          text.includes('rt') ||
+          text.includes('tot') ||
+          text.includes('kg') ||
+          text.includes('no ') ||
+          text.includes('incremento') ||
+          text.includes('@')
+        );
+      };
+
+      const pdfRowTolerance = 2.5;
+
+      const normalizePdfItem = (item, pageHeight) => {
+        const text = normalizePdfText(item.str);
+        if (!text) return null;
+        const x = Number(item.transform?.[4] || 0);
+        const rawY = Number(item.transform?.[5] || 0);
+        return {
+          text,
+          x,
+          y: pageHeight - rawY,
+        };
+      };
+
+      const buildPdfRows = (items, pageHeight) => {
+        const normalized = (items || [])
+          .map((item) => normalizePdfItem(item, pageHeight))
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (Math.abs(a.y - b.y) <= pdfRowTolerance) return a.x - b.x;
+            return a.y - b.y;
+          });
+        const rows = [];
+        normalized.forEach((item) => {
+          const previous = rows[rows.length - 1];
+          if (previous && Math.abs(previous.y - item.y) <= pdfRowTolerance) {
+            previous.items.push(item);
+            return;
+          }
+          rows.push({ y: item.y, items: [item] });
+        });
+        return rows.map((row) => {
+          const sortedItems = row.items.slice().sort((a, b) => a.x - b.x);
+          return {
+            y: row.y,
+            items: sortedItems,
+            text: sortedItems.map((item) => item.text).join(' ').trim(),
+          };
+        });
+      };
+
+      const formatImportedProgramming = (columns) => {
+        const labels = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4', 'Scarico', 'Rec/Som'];
+        return labels
+          .map((label) => {
+            const value = normalizePdfText(columns[label]);
+            return value ? `${label}: ${value}` : '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      };
+
+      const importedWeekColumns = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4', 'Scarico'];
+      const tableColumnLabels = [
+        'exercise',
+        'notes',
+        'Sett 1',
+        'Sett 2',
+        'Sett 3',
+        'Sett 4',
+        'Scarico',
+        'Rec/Som',
+      ];
+
+      const renderPdfPageImage = async (page) => {
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        await page.render({
+          canvasContext: context,
+          viewport,
+          background: 'rgb(255,255,255)',
+        }).promise;
+        return {
+          scale,
+          viewport,
+          width: canvas.width,
+          height: canvas.height,
+          image: context.getImageData(0, 0, canvas.width, canvas.height).data,
+        };
+      };
+
+      const detectTableHorizontalLines = (pageImage) => {
+        const { image, scale, width, height } = pageImage;
+        const startX = Math.floor(width * 0.03);
+        const endX = Math.floor(width * 0.97);
+        const scanWidth = Math.max(endX - startX, 1);
+        const candidateRows = [];
+        for (let y = 0; y < height; y += 1) {
+          let darkPixels = 0;
+          for (let x = startX; x < endX; x += 1) {
+            const index = (y * width + x) * 4;
+            const alpha = image[index + 3];
+            if (alpha < 32) continue;
+            const luminance =
+              0.2126 * image[index] +
+              0.7152 * image[index + 1] +
+              0.0722 * image[index + 2];
+            if (luminance < 185) {
+              darkPixels += 1;
+            }
+          }
+          if (darkPixels / scanWidth >= 0.45) {
+            candidateRows.push(y);
+          }
+        }
+        const clusters = [];
+        candidateRows.forEach((y) => {
+          const current = clusters[clusters.length - 1];
+          if (current && y - current[current.length - 1] <= 2) {
+            current.push(y);
+            return;
+          }
+          clusters.push([y]);
+        });
+        return clusters
+          .map((cluster) => cluster[Math.floor(cluster.length / 2)] / scale)
+          .filter((y, index, list) => index === 0 || y - list[index - 1] > 4);
+      };
+
+      const detectTableVerticalLines = (pageImage, topY, bottomY) => {
+        const { image, scale, width, height } = pageImage;
+        const startY = Math.max(Math.floor(topY * scale), 0);
+        const endY = Math.min(Math.ceil(bottomY * scale), height);
+        const scanHeight = Math.max(endY - startY, 1);
+        const candidateColumns = [];
+        for (let x = 0; x < width; x += 1) {
+          let darkPixels = 0;
+          for (let y = startY; y < endY; y += 1) {
+            const index = (y * width + x) * 4;
+            const alpha = image[index + 3];
+            if (alpha < 32) continue;
+            const luminance =
+              0.2126 * image[index] +
+              0.7152 * image[index + 1] +
+              0.0722 * image[index + 2];
+            if (luminance < 185) {
+              darkPixels += 1;
+            }
+          }
+          if (darkPixels / scanHeight >= 0.35) {
+            candidateColumns.push(x);
+          }
+        }
+        const clusters = [];
+        candidateColumns.forEach((x) => {
+          const current = clusters[clusters.length - 1];
+          if (current && x - current[current.length - 1] <= 2) {
+            current.push(x);
+            return;
+          }
+          clusters.push([x]);
+        });
+        return clusters
+          .map((cluster) => cluster[Math.floor(cluster.length / 2)] / scale)
+          .filter((x, index, list) => index === 0 || x - list[index - 1] > 8);
+      };
+
+      const parseProgramPdfPage = async (page) => {
+        const viewport = page.getViewport({ scale: 1 });
+        const textContent = await page.getTextContent();
+        const normalizedItems = (textContent.items || [])
+          .map((item) => normalizePdfItem(item, viewport.height))
+          .filter(Boolean);
+        const rows = buildPdfRows(textContent.items, viewport.height);
+        const dayTitleRow = rows.find((row) => /giorno\s+[a-g]/i.test(row.text));
+        if (!dayTitleRow) {
+          throw new Error('Missing day title in PDF page.');
+        }
+        const dayMatch = dayTitleRow.text.match(/giorno\s+([a-g])/i);
+        const dayCode = (dayMatch?.[1] || '').toUpperCase();
+        const headerItems = normalizedItems.filter((item) =>
+          /esercizi|note|sett\s*[1-4]|scarico|rec\/som/i.test(item.text),
+        );
+        const headerBottom = headerItems.length
+          ? Math.max(...headerItems.map((item) => item.y)) + 10
+          : dayTitleRow.y + 48;
+        const pageImage = await renderPdfPageImage(page);
+        const horizontalLines = detectTableHorizontalLines(pageImage);
+        const tableLines = horizontalLines
+          .filter((y) => y > headerBottom)
+          .sort((a, b) => a - b);
+        if (!tableLines.length || tableLines[0] - headerBottom > 8) {
+          tableLines.unshift(headerBottom);
+        }
+        const bands = [];
+        for (let index = 0; index < tableLines.length - 1; index += 1) {
+          const top = tableLines[index];
+          const bottom = tableLines[index + 1];
+          if (bottom - top < 8) continue;
+          bands.push({ top, bottom });
+        }
+        const verticalLines = tableLines.length
+          ? detectTableVerticalLines(
+              pageImage,
+              tableLines[0],
+              tableLines[tableLines.length - 1],
+            )
+          : [];
+        const contentMinX = normalizedItems.length
+          ? Math.min(...normalizedItems.map((item) => item.x))
+          : 0;
+        const contentMaxX = normalizedItems.length
+          ? Math.max(...normalizedItems.map((item) => item.x))
+          : viewport.width;
+        const leftBoundary = Math.max(0, contentMinX - 16);
+        const rightBoundary = Math.min(viewport.width, contentMaxX + 16);
+        if (!verticalLines.length || verticalLines[0] - leftBoundary > 12) {
+          verticalLines.unshift(leftBoundary);
+        }
+        if (
+          verticalLines.length < tableColumnLabels.length + 1 ||
+          rightBoundary - verticalLines[verticalLines.length - 1] > 12
+        ) {
+          verticalLines.push(rightBoundary);
+        }
+
+        const entries = bands.map((band) => {
+          const bandItems = normalizedItems.filter(
+            (item) => item.y >= band.top + 1 && item.y < band.bottom - 1,
+          );
+          if (!bandItems.length) return null;
+          if (
+            bandItems.some((item) =>
+              /alessio di buccio|streetlifting|dibbux@gmail\.com|info /i.test(item.text),
+            )
+          ) {
+            return null;
+          }
+          const exerciseLines = [];
+          const noteLines = [];
+          const programmingColumns = {
+            'Sett 1': '',
+            'Sett 2': '',
+            'Sett 3': '',
+            'Sett 4': '',
+            Scarico: '',
+            'Rec/Som': '',
+          };
+          const bandRows = buildPdfRows(
+            bandItems.map((item) => ({
+              str: item.text,
+              transform: [1, 0, 0, 1, item.x, viewport.height - item.y],
+            })),
+            viewport.height,
+          );
+          bandRows.forEach((row) => {
+            const columnValues = {};
+            row.items.forEach((item) => {
+              let columnIndex = -1;
+              for (let index = 0; index < verticalLines.length - 1; index += 1) {
+                if (item.x >= verticalLines[index] && item.x < verticalLines[index + 1]) {
+                  columnIndex = index;
+                  break;
+                }
+              }
+              const label = tableColumnLabels[columnIndex] || null;
+              if (!label) return;
+              columnValues[label] = columnValues[label]
+                ? `${columnValues[label]} ${item.text}`.trim()
+                : item.text;
+            });
+            const left = (columnValues.exercise || '').trim();
+            const middle = (columnValues.notes || '').trim();
+            if (left) {
+              exerciseLines.push(left);
+            }
+            if (middle) {
+              noteLines.push(middle);
+            }
+            importedWeekColumns.concat('Rec/Som').forEach((label) => {
+              const value = normalizePdfText(columnValues[label]);
+              if (!value) return;
+              const currentValue = programmingColumns[label];
+              programmingColumns[label] = currentValue
+                ? `${currentValue} ${value}`.trim()
+                : value;
+            });
+          });
+          const exercise = normalizePdfText(exerciseLines.join(' '));
+          if (/^\s*esercizi\s*$/i.test(exercise) || /esercizi/i.test(exercise)) {
+            return null;
+          }
+          if (!exercise) return null;
+          const hasProgramming = Object.values(programmingColumns).some((value) =>
+            normalizePdfText(value),
+          );
+          if (!hasProgramming) return null;
+          const notes = [noteLines.join('\n').trim(), formatImportedProgramming(programmingColumns)]
+            .filter(Boolean)
+            .join('\n\n');
+          return {
+            exercise,
+            notes,
+            noteText: noteLines.join('\n').trim(),
+            programmingColumns,
+            sourceExercise: exercise,
+            exercise_id: '',
+            duration_minutes: null,
+          };
+        });
+
+        return {
+          dayCode,
+          title: `GIORNO ${dayCode}`,
+          slots: entries.filter(Boolean),
+        };
+      };
+
+      async function importProgramPdf(event) {
+        const input = event?.target;
+        const file = input?.files?.[0];
+        pdfImportError.value = '';
+        pdfImportSummary.value = '';
+        if (!file) return;
+        if (!window.pdfjsLib?.getDocument) {
+          pdfImportError.value = t('errors.pdfImportUnavailable');
+          input.value = '';
+          return;
+        }
+        pdfImportLoading.value = true;
+        try {
+          const fileBuffer = await file.arrayBuffer();
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.worker.min.mjs';
+          const pdf = await window.pdfjsLib.getDocument({ data: fileBuffer }).promise;
+          const importedDays = [];
+          for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
+            const page = await pdf.getPage(pageIndex);
+            const parsedDay = await parseProgramPdfPage(page);
+            importedDays.push(parsedDay);
+          }
+          const sortedDays = importedDays
+            .filter((day) => day?.dayCode)
+            .sort(
+              (a, b) =>
+                dayCodeOptions.indexOf(a.dayCode) - dayCodeOptions.indexOf(b.dayCode),
+            );
+          if (!sortedDays.length) {
+            throw new Error(t('errors.pdfImportFailed'));
+          }
+          const weekCount = Math.max(
+            1,
+            ...sortedDays.map((day) =>
+              (day.slots || []).reduce((maxWeeks, slot) => {
+                const slotWeeks = importedWeekColumns.reduce(
+                  (count, label, index) =>
+                    normalizePdfText(slot.programmingColumns?.[label]) ? index + 1 : count,
+                  0,
+                );
+                return Math.max(maxWeeks, slotWeeks);
+              }, 0),
+            ),
+          );
+          const maxSlots = Math.max(
+            1,
+            ...sortedDays.map((day) => (day.slots || []).length || 0),
+          );
+          templatePlanLoading.value = true;
+          templateWeekCount.value = weekCount;
+          templateDayCount.value = sortedDays.length;
+          templateSlotCount.value = maxSlots;
+          const totalDays = sortedDays.length * weekCount;
+          const nextDays = buildTemplateDays(totalDays, maxSlots, []);
+          sortedDays.forEach((day, dayIndex) => {
+            for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+              const targetIndex = weekIndex * sortedDays.length + dayIndex;
+              nextDays[targetIndex] = {
+                ...nextDays[targetIndex],
+                title: day.title,
+                slots: nextDays[targetIndex].slots.map((slot, slotIndex) => {
+                  const importedSlot = day.slots[slotIndex];
+                  if (!importedSlot) return slot;
+                  const weekLabel = importedWeekColumns[weekIndex];
+                  const weekValue = normalizePdfText(
+                    importedSlot.programmingColumns?.[weekLabel],
+                  );
+                  const recSom = normalizePdfText(
+                    importedSlot.programmingColumns?.['Rec/Som'],
+                  );
+                  const sharedNotes = normalizePdfText(importedSlot.noteText);
+                  const sourceExercise = normalizePdfText(importedSlot.sourceExercise);
+                  const noteParts = [];
+                  if (sourceExercise) {
+                    noteParts.push(`PDF exercise: ${sourceExercise}`);
+                  }
+                  if (sharedNotes) {
+                    noteParts.push(sharedNotes);
+                  }
+                  if (weekValue) {
+                    noteParts.push(`${weekLabel}: ${weekValue}`);
+                  }
+                  if (recSom) {
+                    noteParts.push(`Rec/Som: ${recSom}`);
+                  }
+                  const resolved = resolveExerciseReference(importedSlot.exercise);
+                  return {
+                    ...slot,
+                    exercise: importedSlot.exercise,
+                    exercise_id: resolved?.id || '',
+                    notes: noteParts.join('\n\n'),
+                    duration_minutes: importedSlot.duration_minutes,
+                  };
+                }),
+              };
+            }
+          });
+          programTemplateDays.value = nextDays;
+          selectedTemplateDay.value = 0;
+          selectedTemplateSlot.value = 0;
+          selectedTemplatePlanId.value = '';
+          if (!templatePlanName.value.trim()) {
+            templatePlanName.value = file.name.replace(/\.pdf$/i, '');
+          }
+          const exerciseCount = sortedDays.reduce(
+            (sum, day) => sum + (day.slots || []).length * weekCount,
+            0,
+          );
+          pdfImportSummary.value = t('program.pdfImportSummary', {
+            days: sortedDays.length,
+            exercises: exerciseCount,
+          });
+        } catch (err) {
+          console.error(err);
+          pdfImportError.value = err.message || t('errors.pdfImportFailed');
+        } finally {
+          templatePlanLoading.value = false;
+          pdfImportLoading.value = false;
+          if (input) input.value = '';
+        }
+      }
 
       function resetDayForm() {
         newDayWeek.value = 1;
@@ -1204,6 +1742,18 @@ import {
         }
         savingTemplatePlan.value = true;
         try {
+          let exerciseCatalog = exercises.value || [];
+          if (!exerciseCatalog.length || exercisesContext.value !== 'all') {
+            const { data: allExercises, error: allExercisesError } = await supabase
+              .from('exercises')
+              .select('id, slug, name, difficulty, sort_order, created_at')
+              .order('sort_order', { ascending: true })
+              .order('name', { ascending: true });
+            if (allExercisesError) {
+              throw new Error('Load exercises failed: ' + allExercisesError.message);
+            }
+            exerciseCatalog = allExercises || [];
+          }
           let planId = selectedTemplatePlanId.value;
           const editingExistingPlan = Boolean(planId);
           if (editingExistingPlan) {
@@ -1306,26 +1856,13 @@ import {
           (dayRows || []).forEach((row, dayIndex) => {
             const slots = programTemplateDays.value?.[dayIndex]?.slots || [];
             slots.forEach((slot, slotIndex) => {
-              const exerciseId = (slot.exercise_id || '').trim();
-              const exerciseName = (slot.exercise || '').trim();
-              if (!exerciseId && !exerciseName) return;
-              let resolved = null;
-              if (exerciseId) {
-                const record = getExerciseById(exerciseId);
-                if (record) {
-                  resolved = {
-                    id: record.id,
-                    name: record.name || record.slug || '',
-                  };
-                } else {
-                  unresolvedExercises.add(exerciseId);
-                  return;
-                }
-              } else {
-                resolved = resolveExerciseReference(exerciseName);
-              }
-              if (!resolved) {
-                unresolvedExercises.add(exerciseName || exerciseId);
+              if (!hasDayExerciseContent(slot)) return;
+              const resolved = normalizeDayExerciseReference(
+                slot,
+                exerciseCatalog,
+              );
+              if (resolved.unresolved) {
+                unresolvedExercises.add(resolved.unresolved);
                 return;
               }
               exercisePayloads.push({
@@ -1337,8 +1874,8 @@ import {
                   slot.duration_minutes === undefined
                     ? null
                     : slot.duration_minutes,
-                exercise: resolved.name || exerciseName,
-                exercise_id: resolved.id,
+                exercise: resolved.exercise,
+                exercise_id: resolved.exercise_id,
               });
             });
           });
@@ -1521,16 +2058,176 @@ import {
       }
 
       async function loadTrainers() {
-        const { data, error } = await supabase
-          .from('trainers')
-          .select('id, name')
-          .order('name', { ascending: true });
-        if (error) {
+        loadingTrainers.value = true;
+        trainerDirectoryError.value = '';
+        try {
+          const { data, error } = await supabase
+            .from('trainers')
+            .select('id, name, created_at')
+            .order('name', { ascending: true });
+          if (error) {
+            throw new Error(error.message);
+          }
+          let assignmentRows = [];
+          const assignmentResponse = await supabase
+            .from('trainee_trainers')
+            .select('trainer_id');
+          if (assignmentResponse.error) {
+            throw new Error(assignmentResponse.error.message);
+          }
+          assignmentRows = assignmentResponse.data || [];
+          const counts = new Map();
+          assignmentRows.forEach((row) => {
+            if (!row?.trainer_id) return;
+            counts.set(row.trainer_id, (counts.get(row.trainer_id) || 0) + 1);
+          });
+          trainers.value = (data || []).map((trainer) => ({
+            ...trainer,
+            assignedCount: counts.get(trainer.id) || 0,
+            displayName: trainer.name || shortId(trainer.id),
+          }));
+          trainerEdits.value = {};
+          trainers.value.forEach((trainer) => {
+            trainerEdits.value = {
+              ...trainerEdits.value,
+              [trainer.id]: {
+                name: trainer.name || '',
+              },
+            };
+          });
+        } catch (error) {
           console.error(error);
+          trainers.value = [];
+          trainerDirectoryError.value =
+            error.message || t('errors.loadTrainers');
           alert(t('errors.loadTrainers', { message: error.message }));
+        } finally {
+          loadingTrainers.value = false;
+        }
+      }
+
+      function resetTrainerForm() {
+        trainerForm.value = {
+          id: '',
+          name: '',
+        };
+      }
+
+      function normalizeUuid(value) {
+        return (value || '').trim().toLowerCase();
+      }
+
+      function isUuid(value) {
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          value,
+        );
+      }
+
+      async function createTrainer() {
+        if (!canAssignTrainers.value || creatingTrainer.value) return;
+        const id = normalizeUuid(trainerForm.value.id);
+        const name = (trainerForm.value.name || '').trim();
+        if (!id) {
+          alert(t('errors.trainerIdRequired'));
           return;
         }
-        trainers.value = data || [];
+        if (!isUuid(id)) {
+          alert(t('errors.trainerIdInvalid'));
+          return;
+        }
+        if (!name) {
+          alert(t('errors.trainerNameRequired'));
+          return;
+        }
+        creatingTrainer.value = true;
+        try {
+          const { error } = await supabase.from('trainers').insert({ id, name });
+          if (error) {
+            throw new Error(error.message);
+          }
+          resetTrainerForm();
+          await Promise.all([loadTrainers(), loadUsers()]);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || t('errors.createTrainer'));
+        } finally {
+          creatingTrainer.value = false;
+        }
+      }
+
+      async function saveTrainer(trainer) {
+        if (!canAssignTrainers.value || !trainer?.id || trainerSaving.value[trainer.id]) {
+          return;
+        }
+        const nextName = (trainerEdits.value[trainer.id]?.name || '').trim();
+        if (!nextName) {
+          alert(t('errors.trainerNameRequired'));
+          return;
+        }
+        trainerSaving.value = {
+          ...trainerSaving.value,
+          [trainer.id]: true,
+        };
+        try {
+          const { error } = await supabase
+            .from('trainers')
+            .update({ name: nextName })
+            .eq('id', trainer.id);
+          if (error) {
+            throw new Error(error.message);
+          }
+          await Promise.all([loadTrainers(), loadUsers()]);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || t('errors.updateTrainer'));
+        } finally {
+          trainerSaving.value = {
+            ...trainerSaving.value,
+            [trainer.id]: false,
+          };
+        }
+      }
+
+      async function deleteTrainer(trainer) {
+        if (!canAssignTrainers.value || !trainer?.id || trainerSaving.value[trainer.id]) {
+          return;
+        }
+        const confirmed = confirm(
+          t('confirm.deleteTrainer', {
+            name: trainer.name || trainer.id,
+            count: trainer.assignedCount || 0,
+          }),
+        );
+        if (!confirmed) return;
+        trainerSaving.value = {
+          ...trainerSaving.value,
+          [trainer.id]: true,
+        };
+        try {
+          const { error: assignmentError } = await supabase
+            .from('trainee_trainers')
+            .delete()
+            .eq('trainer_id', trainer.id);
+          if (assignmentError) {
+            throw new Error(assignmentError.message);
+          }
+          const { error } = await supabase
+            .from('trainers')
+            .delete()
+            .eq('id', trainer.id);
+          if (error) {
+            throw new Error(error.message);
+          }
+          await Promise.all([loadTrainers(), loadUsers()]);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || t('errors.deleteTrainer'));
+        } finally {
+          trainerSaving.value = {
+            ...trainerSaving.value,
+            [trainer.id]: false,
+          };
+        }
       }
 
       async function createTrainee() {
@@ -1603,11 +2300,42 @@ import {
           .replace(/(^-|-$)+/g, '');
       }
 
-      function resolveExerciseReference(value) {
+      function levenshteinDistance(a, b) {
+        const left = a || '';
+        const right = b || '';
+        const rows = left.length + 1;
+        const cols = right.length + 1;
+        const matrix = Array.from({ length: rows }, () => Array(cols).fill(0));
+        for (let row = 0; row < rows; row += 1) matrix[row][0] = row;
+        for (let col = 0; col < cols; col += 1) matrix[0][col] = col;
+        for (let row = 1; row < rows; row += 1) {
+          for (let col = 1; col < cols; col += 1) {
+            const cost = left[row - 1] === right[col - 1] ? 0 : 1;
+            matrix[row][col] = Math.min(
+              matrix[row - 1][col] + 1,
+              matrix[row][col - 1] + 1,
+              matrix[row - 1][col - 1] + cost,
+            );
+          }
+        }
+        return matrix[rows - 1][cols - 1];
+      }
+
+      function normalizeExerciseComparable(value) {
+        return (value || '')
+          .toLowerCase()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/½/g, ' mezzo ')
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+      }
+
+      function resolveExerciseReferenceFromList(value, list = exercises.value || []) {
         const trimmed = (value || '').trim();
         if (!trimmed) return null;
         const normalizedSlug = normalizeExerciseSlug(trimmed);
-        const list = exercises.value || [];
+        const comparable = normalizeExerciseComparable(trimmed);
         const match = list.find((exercise) => {
           if (!exercise) return false;
           if (exercise.id === trimmed) return true;
@@ -1615,8 +2343,34 @@ import {
           if (exercise.slug === normalizedSlug) return true;
           return (exercise.name || '').toLowerCase() === trimmed.toLowerCase();
         });
-        if (!match) return null;
-        return { id: match.id, slug: match.slug, name: match.name };
+        if (match) {
+          return { id: match.id, slug: match.slug, name: match.name };
+        }
+        let bestMatch = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        (list || []).forEach((exercise) => {
+          if (!exercise) return;
+          const candidates = [
+            normalizeExerciseComparable(exercise.name || ''),
+            normalizeExerciseComparable(exercise.slug || ''),
+          ].filter(Boolean);
+          if (!candidates.length) return;
+          const distance = Math.min(
+            ...candidates.map((candidate) => levenshteinDistance(comparable, candidate)),
+          );
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestMatch = exercise;
+          }
+        });
+        if (!bestMatch || !comparable) return null;
+        const maxDistance = Math.max(2, Math.floor(comparable.length * 0.28));
+        if (bestDistance > maxDistance) return null;
+        return { id: bestMatch.id, slug: bestMatch.slug, name: bestMatch.name };
+      }
+
+      function resolveExerciseReference(value) {
+        return resolveExerciseReferenceFromList(value, exercises.value || []);
       }
 
       function formatDifficultyLabel(value) {
@@ -3476,6 +4230,45 @@ import {
         if (!confirmed) return;
         savingPlan.value = true;
         try {
+          const { data: existingLinks, error: linksError } = await supabase
+            .from('workout_plan_days')
+            .select('day_id')
+            .eq('plan_id', plan.id);
+          if (linksError) {
+            throw new Error('Load plan links failed: ' + linksError.message);
+          }
+          const existingDayIds = (existingLinks || [])
+            .map((row) => row.day_id)
+            .filter(Boolean);
+          if (existingDayIds.length) {
+            const { error: exerciseDeleteError } = await supabase
+              .from('day_exercises')
+              .delete()
+              .in('day_id', existingDayIds);
+            if (exerciseDeleteError) {
+              throw new Error(
+                'Delete plan exercises failed: ' + exerciseDeleteError.message,
+              );
+            }
+            const { error: linkDeleteError } = await supabase
+              .from('workout_plan_days')
+              .delete()
+              .eq('plan_id', plan.id);
+            if (linkDeleteError) {
+              throw new Error(
+                'Delete plan links failed: ' + linkDeleteError.message,
+              );
+            }
+            const { error: dayDeleteError } = await supabase
+              .from('days')
+              .delete()
+              .in('id', existingDayIds);
+            if (dayDeleteError) {
+              throw new Error(
+                'Delete plan days failed: ' + dayDeleteError.message,
+              );
+            }
+          }
           const { error } = await supabase
             .from('workout_plans')
             .delete()
@@ -3483,7 +4276,11 @@ import {
           if (error) {
             throw new Error('Delete plan failed: ' + error.message);
           }
-          await loadPlans();
+          if (selectedTemplatePlanId.value === plan.id) {
+            selectedTemplatePlanId.value = '';
+            resetTemplateBuilder();
+          }
+          await Promise.all([loadPlans(), loadDays()]);
         } catch (err) {
           console.error(err);
           alert(err.message || t('errors.deletePlan'));
@@ -3499,13 +4296,12 @@ import {
         }
         ensureSelection(day.id);
         const selection = exerciseSelection.value[day.id];
-        const exercise = (selection?.exercise || '').trim();
-        if (!exercise) {
-          alert(t('errors.chooseExercise'));
+        if (!hasDayExerciseContent(selection)) {
+          alert(t('errors.emptyActivity'));
           return;
         }
-        const resolved = resolveExerciseReference(exercise);
-        if (!resolved) {
+        const resolved = normalizeDayExerciseReference(selection);
+        if (resolved.unresolved) {
           alert(t('errors.chooseExercise'));
           return;
         }
@@ -3517,8 +4313,8 @@ import {
           const nextPosition = (positions.length ? Math.max(...positions) : 0) + 1;
           const { error } = await supabase.from('day_exercises').insert({
             day_id: day.id,
-            exercise: resolved.name,
-            exercise_id: resolved.id,
+            exercise: resolved.exercise,
+            exercise_id: resolved.exercise_id,
             notes: (selection.notes || '').trim() || null,
             position: nextPosition,
             duration_minutes:
@@ -3597,10 +4393,17 @@ import {
               ? null
               : Number(form.duration_minutes),
         };
-        const resolved = resolveExerciseReference(form.exercise || ex.exercise || '');
-        if (resolved) {
-          payload.exercise = resolved.name;
-          payload.exercise_id = resolved.id;
+        if (Object.prototype.hasOwnProperty.call(form, 'exercise')) {
+          const resolved = normalizeDayExerciseReference({
+            exercise: form.exercise,
+            exercise_id: form.exercise_id,
+          });
+          if (resolved.unresolved) {
+            alert(t('errors.chooseExercise'));
+            return;
+          }
+          payload.exercise = resolved.exercise;
+          payload.exercise_id = resolved.exercise_id;
         }
         const { error } = await supabase
           .from('day_exercises')
@@ -3630,6 +4433,7 @@ import {
 
       onMounted(async () => {
         updateDocumentLanguage();
+        applyDocumentTheme();
         const {
           data: { session: sess },
         } = await supabase.auth.getSession();
@@ -3655,6 +4459,7 @@ import {
       return {
         session,
         user,
+        theme,
         email,
         password,
         authLoading,
@@ -3669,6 +4474,7 @@ import {
         traineeForm,
         creatingTrainee,
         filteredUsers,
+        filteredTrainers,
         dashboardTrainees,
         currentFeedbackEntries,
         showLastWeekCard,
@@ -3683,8 +4489,14 @@ import {
         paymentTrendsError,
         canAssignTrainers,
         trainers,
+        trainerForm,
+        trainerEdits,
         trainerSelections,
         trainerAssignmentSaving,
+        trainerSaving,
+        creatingTrainer,
+        loadingTrainers,
+        trainerDirectoryError,
         current,
         currentTrainer,
         days,
@@ -3744,6 +4556,9 @@ import {
         templatePlanName,
         selectedTemplatePlanId,
         templatePlanLoading,
+        pdfImportLoading,
+        pdfImportError,
+        pdfImportSummary,
         programTemplateDays,
         templateWeekGroups,
         selectedTemplateDay,
@@ -3803,6 +4618,9 @@ import {
         dayCodeLabel,
         planStatusLabel,
         templateDayLabel,
+        toggleTheme: () => {
+          theme.value = theme.value === 'dark' ? 'light' : 'dark';
+        },
         resolveTemplateSlotName,
         selectTemplateDay,
         selectTemplateSlot,
@@ -3815,6 +4633,11 @@ import {
         selectUser,
         openTrainee,
         createTrainee,
+        loadTrainers,
+        createTrainer,
+        resetTrainerForm,
+        saveTrainer,
+        deleteTrainer,
         loadDays,
         loadMaxTests,
         loadPlans,
@@ -3856,6 +4679,7 @@ import {
         savePlan,
         deletePlan,
         saveTemplatePlan,
+        importProgramPdf,
         saveDayExercise,
         resetDayExerciseEdit,
         deleteDayExercise,

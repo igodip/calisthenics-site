@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://jrqjysycoqhlnyufhliy.supabase.co';
-const SUPABASE_ANON =
+const DEFAULT_SUPABASE_URL = 'https://jrqjysycoqhlnyufhliy.supabase.co';
+const DEFAULT_SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpycWp5c3ljb3FobG55dWZobGl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MzM0NTIsImV4cCI6MjA2ODAwOTQ1Mn0.3BVA-Ar9YtLGGO12Gt6NQkMl2cn18E_b48PGtlFxxCw';
 
 const supabaseLoadMessages = {
@@ -12,6 +12,17 @@ export const getBrowserLocale = () =>
 
 export const getSupabaseLoadMessage = (locale) =>
   supabaseLoadMessages[locale] || supabaseLoadMessages.en;
+
+const getRuntimeConfig = () => {
+  const g = window;
+  const config = g.__CALISYNC_CONFIG__ || g.CALISYNC_CONFIG || {};
+
+  return {
+    url: config.supabaseUrl || config.SUPABASE_URL || DEFAULT_SUPABASE_URL,
+    anonKey:
+      config.supabaseAnonKey || config.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON,
+  };
+};
 
 export const createSupabaseClient = () => {
   const g = window;
@@ -27,8 +38,17 @@ export const createSupabaseClient = () => {
     };
   }
 
+  const { url, anonKey } = getRuntimeConfig();
+
+  if (!url || !anonKey) {
+    return {
+      supabase: null,
+      error: 'Supabase configuration is missing. Define window.__CALISYNC_CONFIG__ before app.js.',
+    };
+  }
+
   return {
-    supabase: createClient(SUPABASE_URL, SUPABASE_ANON),
+    supabase: createClient(url, anonKey),
     error: null,
   };
 };
