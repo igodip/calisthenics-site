@@ -530,7 +530,11 @@ button:disabled{
 }
 
 .dashboard-grid{
-  grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+
+.payments-grid{
+  grid-template-columns:repeat(3, minmax(0, 1fr));
 }
 
 .overview-grid{
@@ -648,6 +652,47 @@ button:disabled{
   gap:12px;
 }
 
+.payment-card{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.payment-card-toggle{
+  width:100%;
+  padding:0;
+  border:none;
+  background:transparent;
+  text-align:left;
+}
+
+.payment-card-summary{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:auto;
+}
+
+.payment-card-chevron{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  color:var(--muted);
+  transition:transform .18s ease;
+}
+
+.payment-card-chevron.open{
+  transform:rotate(180deg);
+}
+
+.payment-card-body{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
 .crud-item{
   gap:12px;
   align-items:flex-start;
@@ -692,6 +737,10 @@ button:disabled{
   color:#fff;
 }
 
+.trainee-tabs{
+  margin-bottom:12px;
+}
+
 .payments-list{
   max-height:560px;
 }
@@ -699,6 +748,13 @@ button:disabled{
 .payment-trend-card,
 .dashboard-burndown-card{
   grid-column:1 / -1;
+}
+
+@media (max-width: 1200px){
+  .dashboard-grid,
+  .payments-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
 }
 
 .payment-trend-body,
@@ -1174,15 +1230,6 @@ button:disabled{
   background:var(--accent);
 }
 
-.workout-detail-image{
-  height:220px;
-  display:grid;
-  place-items:center;
-  border-radius:18px;
-  border:1px solid var(--line);
-  background:linear-gradient(180deg, #f9fbfd 0%, #ffffff 100%);
-}
-
 .workout-detail-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
@@ -1370,6 +1417,7 @@ button:disabled{
   }
 
   .dashboard-grid,
+  .payments-grid,
   .overview-grid,
   .compact-overview-grid,
   .calendar-grid,
@@ -1435,10 +1483,6 @@ button:disabled{
 
   .template-slot{
     grid-template-columns:1fr;
-  }
-
-  .workout-detail-image{
-    height:180px;
   }
 
   .history-chart-wrap{

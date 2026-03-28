@@ -28,6 +28,9 @@ import {
     setup() {
       const storedLocale = localStorage.getItem('adminLocale');
       const storedTheme = localStorage.getItem('adminTheme');
+      const pageUrl = new URL(window.location.href);
+      const isTraineeDetailPage = pageUrl.pathname.endsWith('/trainee.html');
+      const traineeDetailId = pageUrl.searchParams.get('id');
       const locale = ref(storedLocale || fallbackLocale);
       const theme = ref(storedTheme || 'light');
       const {
@@ -48,9 +51,11 @@ import {
         localStorage.setItem('adminLocale', nextLocale);
         updateDocumentLanguage();
         if (session.value) {
-          await loadTerminology();
-          await loadDashboardNotes();
-          if (feedbackEntries.value.length) {
+          if (!isTraineeDetailPage) {
+            await loadTerminology();
+            await loadDashboardNotes();
+          }
+          if (feedbackEntries.value.length || isTraineeDetailPage) {
             await loadFeedbackEntries();
           }
         }
@@ -67,7 +72,7 @@ import {
       const authLoading = ref(false);
       const authError = ref('');
       const search = ref('');
-      const activeSection = ref('dashboard');
+      const activeSection = ref(isTraineeDetailPage ? 'trainees' : 'dashboard');
       const paymentFilter = ref('all');
       const currentAdmin = ref(null);
       const currentTrainer = ref(null);
@@ -117,6 +122,8 @@ import {
       });
       const creatingTrainee = ref(false);
       const current = ref(null);
+      const currentTraineeTab = ref('overview');
+      const currentCalendarExpanded = ref(false);
       const days = ref([]);
       const plans = ref([]);
       const exerciseSelection = ref({});
@@ -133,6 +140,15 @@ import {
       const maxTests = ref([]);
       const loadingMaxTests = ref(false);
       const maxTestsError = ref('');
+      const weightLogs = ref([]);
+      const loadingWeightLogs = ref(false);
+      const weightLogsError = ref('');
+      const weightLogSaving = ref(false);
+      const weightLogForm = ref({
+        weight: '',
+        recorded_at: '',
+        notes: '',
+      });
       const maxTestForm = ref({
         exercise: '',
         value: '',
@@ -147,6 +163,7 @@ import {
       const paymentSaving = ref({});
       const paymentAmountEdits = ref({});
       const paymentAmountSaving = ref({});
+      const expandedPaymentCards = ref({});
       const paymentHistory = ref([]);
       const loadingPayments = ref(false);
       const paymentsError = ref('');
@@ -762,6 +779,58 @@ import {
             };
           })
           .sort((a, b) => a.exercise.localeCompare(b.exercise));
+      });
+
+      const weightHistory = computed(() => {
+        const sorted = (weightLogs.value || [])
+          .map((entry) => ({
+            ...entry,
+            weight: Number(entry.weight || 0),
+            timestamp: Date.parse(entry.recorded_at || entry.created_at || '') || Date.now(),
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp);
+        if (!sorted.length) return null;
+        const values = sorted.map((item) => item.weight);
+        const maxValue = Math.max(...values);
+        const minValue = Math.min(...values);
+        const minDate = sorted[0].timestamp;
+        const maxDate = sorted[sorted.length - 1].timestamp;
+        const range = maxValue - minValue || 1;
+        const timeRange = maxDate - minDate || 1;
+        const chartWidth = 320;
+        const chartHeight = 110;
+        const padding = 12;
+        const points = sorted.map((item) => {
+          const x =
+            padding +
+            ((item.timestamp - minDate) / timeRange) * (chartWidth - padding * 2);
+          const y =
+            chartHeight -
+            padding -
+            ((item.weight - minValue) / range) * (chartHeight - padding * 2);
+          return {
+            x: Number(x.toFixed(2)),
+            y: Number(y.toFixed(2)),
+            weight: item.weight,
+            recorded_at: item.recorded_at,
+          };
+        });
+        const latest = sorted[sorted.length - 1];
+        const first = sorted[0];
+        return {
+          count: sorted.length,
+          minValue,
+          maxValue,
+          latestValue: latest.weight,
+          deltaValue: Number((latest.weight - first.weight).toFixed(1)),
+          latestLabel: latest.recorded_at ? formatDate(latest.recorded_at) : '',
+          minDateLabel: first.recorded_at ? formatDate(first.recorded_at) : '',
+          maxDateLabel: latest.recorded_at ? formatDate(latest.recorded_at) : '',
+          chartWidth,
+          chartHeight,
+          points,
+          polyline: points.map((point) => `${point.x},${point.y}`).join(' '),
+        };
       });
 
       const completedExerciseLog = computed(() => {
@@ -2006,23 +2075,30 @@ import {
         location.reload();
       }
 
+      function goToTraineesPage() {
+        window.location.href = './index.html';
+      }
+
       async function bootstrap() {
         await loadAccess();
         if (canAssignTrainers.value) {
           await loadTrainers();
         }
         await loadUsers();
-        await loadPaymentTrends();
-        await loadTerminology();
-        await loadTraineeProgress();
-        await loadDashboardBurndown();
-        await loadDashboardNotes();
-        await loadFeedbackEntries();
-        if (users.value.length) {
-          await selectUser(users.value[0]);
-          await loadPlans(users.value[0]);
-          await loadDays(users.value[0]);
-          await loadPaymentHistory(users.value[0]);
+        if (isTraineeDetailPage) {
+          const target = traineeDetailId
+            ? (users.value || []).find((entry) => entry.id === traineeDetailId)
+            : users.value[0];
+          if (target) {
+            await openTrainee(target);
+          }
+        } else {
+          await loadPaymentTrends();
+          await loadTerminology();
+          await loadTraineeProgress();
+          await loadDashboardBurndown();
+          await loadDashboardNotes();
+          await loadFeedbackEntries();
         }
         hasBootstrapped.value = true;
       }
@@ -3081,6 +3157,17 @@ import {
         void updatePaymentStatus(u, nextPaid, target);
       }
 
+      function isPaymentCardOpen(userId) {
+        return !!expandedPaymentCards.value[userId];
+      }
+
+      function togglePaymentCard(userId) {
+        expandedPaymentCards.value = {
+          ...expandedPaymentCards.value,
+          [userId]: !expandedPaymentCards.value[userId],
+        };
+      }
+
       function markPaymentPaid(u) {
         void updatePaymentStatus(u, true);
       }
@@ -3127,12 +3214,21 @@ import {
 
       async function selectUser(u) {
         current.value = u;
+        currentTraineeTab.value = 'overview';
+        currentCalendarExpanded.value = false;
         days.value = [];
         plans.value = [];
         planEdits.value = {};
         expandedDays.value = {};
         maxTests.value = [];
         maxTestsError.value = '';
+        weightLogs.value = [];
+        weightLogsError.value = '';
+        weightLogForm.value = {
+          weight: '',
+          recorded_at: '',
+          notes: '',
+        };
         maxTestForm.value = {
           exercise: '',
           value: '',
@@ -3145,10 +3241,16 @@ import {
         trainerNotesDraft.value = u?.trainer_notes || '';
         await loadExercises(u);
         await loadMaxTests(u);
+        await loadWeightLogs(u);
       }
 
       async function openTrainee(u) {
-        activeSection.value = 'program';
+        if (!u?.id) return;
+        if (!isTraineeDetailPage) {
+          window.location.href = `./trainee.html?id=${encodeURIComponent(u.id)}`;
+          return;
+        }
+        activeSection.value = 'trainees';
         await selectUser(u);
         await Promise.all([
           loadDays(u),
@@ -3368,6 +3470,71 @@ import {
           maxTestsError.value = err.message || t('errors.loadMaxTests');
         } finally {
           loadingMaxTests.value = false;
+        }
+      }
+
+      async function loadWeightLogs(u = current.value) {
+        if (!u) return;
+        loadingWeightLogs.value = true;
+        weightLogsError.value = '';
+        try {
+          const { data, error } = await supabase
+            .from('trainee_weight_logs')
+            .select('id, trainee_id, weight, recorded_at, notes, created_at')
+            .eq('trainee_id', u.id)
+            .order('recorded_at', { ascending: true })
+            .order('created_at', { ascending: true });
+          if (error) {
+            throw new Error(error.message);
+          }
+          weightLogs.value = data || [];
+        } catch (err) {
+          console.error(err);
+          weightLogs.value = [];
+          weightLogsError.value = err.message || t('errors.loadWeightLogs');
+        } finally {
+          loadingWeightLogs.value = false;
+        }
+      }
+
+      async function addWeightLog() {
+        if (!current.value?.id) {
+          alert(t('errors.selectTrainee'));
+          return;
+        }
+        const weight = Number(weightLogForm.value.weight);
+        if (!Number.isFinite(weight) || weight <= 0) {
+          alert(t('errors.traineeWeightInvalid'));
+          return;
+        }
+        weightLogSaving.value = true;
+        try {
+          const payload = {
+            trainee_id: current.value.id,
+            weight,
+            recorded_at:
+              weightLogForm.value.recorded_at || new Date().toISOString().slice(0, 10),
+            notes: (weightLogForm.value.notes || '').trim() || null,
+          };
+          const { error } = await supabase.from('trainee_weight_logs').insert(payload);
+          if (error) {
+            throw new Error(error.message);
+          }
+          weightLogForm.value = {
+            weight: '',
+            recorded_at: '',
+            notes: '',
+          };
+          await Promise.all([loadWeightLogs(current.value), loadUsers()]);
+          const refreshed = (users.value || []).find((entry) => entry.id === current.value.id);
+          if (refreshed) {
+            current.value = refreshed;
+          }
+        } catch (err) {
+          console.error(err);
+          alert(err.message || t('errors.addWeightLog'));
+        } finally {
+          weightLogSaving.value = false;
         }
       }
 
@@ -3941,14 +4108,14 @@ import {
             return;
           }
 
-          const { data: exerciseRows, error: exerciseError } = await supabase
-            .from('day_exercises')
+          const { data: dayRows, error: dayError } = await supabase
+            .from('days')
             .select(
-              'id, completed, duration_minutes, days!inner ( completed_at, workout_plan_days!inner ( plan_id ) )',
+              'id, completed_at, workout_plan_days!inner ( plan_id, workout_plans!inner ( trainee_id ) ), day_exercises ( id, completed )',
             )
-            .in('days.workout_plan_days.plan_id', planIds);
-          if (exerciseError) {
-            throw new Error(exerciseError.message);
+            .in('workout_plan_days.plan_id', planIds);
+          if (dayError) {
+            throw new Error(dayError.message);
           }
 
           const totalByPlan = new Map();
@@ -3956,26 +4123,33 @@ import {
           const completedBeforeStart = new Map();
           const { start, dates } = buildDateRange(30);
           const startKey = dateKey(start);
+          const endKey = dates.length ? dateKey(dates[dates.length - 1]) : startKey;
 
-          (exerciseRows || []).forEach((row) => {
-            const day = row.days || {};
+          (dayRows || []).forEach((day) => {
             const planEntries = day.workout_plan_days || [];
             const planId = planEntries?.[0]?.plan_id;
             if (!planId) return;
-            totalByPlan.set(planId, (totalByPlan.get(planId) || 0) + 1);
-            if (!row.completed || !day.completed_at) return;
-            const completedKey = dateKey(day.completed_at);
-            if (!completedKey) return;
+            const exercises = Array.isArray(day.day_exercises)
+              ? day.day_exercises
+              : [];
+            if (!exercises.length) return;
+            totalByPlan.set(planId, (totalByPlan.get(planId) || 0) + exercises.length);
+            const completedCount = exercises.filter((row) => row?.completed).length;
+            if (!completedCount) return;
+            const completedKey = dateKey(day.completed_at) || endKey;
             if (completedKey < startKey) {
               completedBeforeStart.set(
                 planId,
-                (completedBeforeStart.get(planId) || 0) + 1,
+                (completedBeforeStart.get(planId) || 0) + completedCount,
               );
               return;
             }
             const planMap =
               completedByPlanDate.get(planId) || new Map();
-            planMap.set(completedKey, (planMap.get(completedKey) || 0) + 1);
+            planMap.set(
+              completedKey,
+              (planMap.get(completedKey) || 0) + completedCount,
+            );
             completedByPlanDate.set(planId, planMap);
           });
 
@@ -4460,6 +4634,8 @@ import {
         session,
         user,
         theme,
+        isTraineeDetailPage,
+        hasBootstrapped,
         email,
         password,
         authLoading,
@@ -4498,6 +4674,8 @@ import {
         loadingTrainers,
         trainerDirectoryError,
         current,
+        currentTraineeTab,
+        currentCalendarExpanded,
         currentTrainer,
         days,
         exercises,
@@ -4521,6 +4699,9 @@ import {
         terminologySaving,
         maxTests,
         maxTestHistory,
+        weightLogs,
+        weightHistory,
+        weightLogForm,
         maxTestForm,
         completedExerciseLog,
         exerciseSelection,
@@ -4591,6 +4772,9 @@ import {
         loadingMaxTests,
         maxTestsError,
         maxTestSaving,
+        loadingWeightLogs,
+        weightLogsError,
+        weightLogSaving,
         coachTipDraft,
         coachTipSaving,
         trainerNotesDraft,
@@ -4598,6 +4782,7 @@ import {
         paymentSaving,
         paymentAmountEdits,
         paymentAmountSaving,
+        expandedPaymentCards,
         savePaymentAmount,
         paymentHistory,
         loadingPayments,
@@ -4630,6 +4815,7 @@ import {
         setDayCode,
         emailPasswordSignIn,
         signOut,
+        goToTraineesPage,
         selectUser,
         openTrainee,
         createTrainee,
@@ -4640,6 +4826,7 @@ import {
         deleteTrainer,
         loadDays,
         loadMaxTests,
+        loadWeightLogs,
         loadPlans,
         loadPaymentHistory,
         loadCompletedExercises,
@@ -4654,6 +4841,7 @@ import {
         resetDayForm,
         resetPlanForm,
         addExerciseToDay,
+        addWeightLog,
         saveCoachTip,
         addMaxTest,
         saveTrainerNotes,
@@ -4684,6 +4872,8 @@ import {
         resetDayExerciseEdit,
         deleteDayExercise,
         shortId,
+        isPaymentCardOpen,
+        togglePaymentCard,
         togglePayment,
         markPaymentPaid,
         formatDifficultyLabel,

@@ -71,18 +71,6 @@
                     <span>{{ t('sections.payments') }}</span>
                     <span class="nav-badge">{{ paymentUsers.length }}</span>
                 </button>
-                <button :class="{active: activeSection==='program'}" @click="activeSection='program'">
-                    <span>{{ t('sections.program') }}</span>
-                    <span class="nav-badge">{{ current ? 1 : 0 }}</span>
-                </button>
-                <button :class="{active: activeSection==='plans'}" @click="activeSection='plans'">
-                    <span>{{ t('sections.plans') }}</span>
-                    <span class="nav-badge">{{ plans.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='history'}" @click="activeSection='history'">
-                    <span>{{ t('sections.history') }}</span>
-                    <span class="nav-badge">{{ maxTestHistory.length }}</span>
-                </button>
                 <button :class="{active: activeSection==='exercises'}" @click="activeSection='exercises'">
                     <span>{{ t('sections.exercises') }}</span>
                     <span class="nav-badge">{{ exercises.length }}</span>
@@ -768,39 +756,53 @@
                     <div v-if="paymentUsers.length===0" class="muted small">{{ t('payments.noMatches') }}</div>
                     <div v-else class="list scroll-area payments-list">
                         <div v-for="u in paymentUsers" :key="u.id" class="card payment-card">
-                            <div class="payment-card-header">
+                            <button
+                                class="payment-card-header payment-card-toggle"
+                                type="button"
+                                @click="togglePaymentCard(u.id)"
+                                :aria-expanded="isPaymentCardOpen(u.id) ? 'true' : 'false'"
+                            >
                                 <div class="stack">
                                     <strong>{{ u.displayName || shortId(u.id) }}</strong>
+                                    <span class="muted small mono">{{ u.id }}</span>
                                 </div>
+                                <div class="payment-card-summary">
+                                    <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
+                                        {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
+                                    </span>
+                                    <span class="payment-card-chevron" :class="{ open: isPaymentCardOpen(u.id) }">⌄</span>
+                                </div>
+                            </button>
+                            <div v-if="isPaymentCardOpen(u.id)" class="payment-card-body">
+                                <div class="payment-actions">
+                                    <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
+                                        {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
+                                    </span>
+                                    <button class="small" type="button" @click="openTrainee(u)">{{ t('actions.openTrainee') }}</button>
+                                </div>
+                                <div class="payment-amount-row">
+                                    <label class="stack small">
+                                        <span class="muted small">{{ t('labels.amount') }}</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            v-model="paymentAmountEdits[u.id]"
+                                            :placeholder="t('placeholders.amount')"
+                                        />
+                                    </label>
+                                    <button
+                                        class="small"
+                                        type="button"
+                                        :disabled="paymentAmountSaving[u.id]"
+                                        @click="savePaymentAmount(u)"
+                                    >
+                                        {{ t('actions.save') }}
+                                    </button>
+                                </div>
+                                <div class="muted small" v-if="paymentSaving[u.id]">{{ t('status.updatingPayment') }}</div>
+                                <div class="muted small" v-if="paymentAmountSaving[u.id]">{{ t('status.updatingPaymentAmount') }}</div>
                             </div>
-                            <div class="payment-actions">
-                                <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
-                                    {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
-                                </span>
-                                <button class="small" type="button" @click="openTrainee(u)">{{ t('actions.openTrainee') }}</button>
-                            </div>
-                            <div class="payment-amount-row">
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.amount') }}</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        v-model="paymentAmountEdits[u.id]"
-                                        :placeholder="t('placeholders.amount')"
-                                    />
-                                </label>
-                                <button
-                                    class="small"
-                                    type="button"
-                                    :disabled="paymentAmountSaving[u.id]"
-                                    @click="savePaymentAmount(u)"
-                                >
-                                    {{ t('actions.save') }}
-                                </button>
-                            </div>
-                            <div class="muted small" v-if="paymentSaving[u.id]">{{ t('status.updatingPayment') }}</div>
-                            <div class="muted small" v-if="paymentAmountSaving[u.id]">{{ t('status.updatingPaymentAmount') }}</div>
                         </div>
                     </div>
                 </div>
@@ -927,593 +929,22 @@
                 </div>
             </div>
 
-            <div class="row section-panel program-panel" :class="{active: activeSection==='program'}">
-                <div class="col program-main">
-                    <div class="card" v-if="!current">
-                    <h2>{{ t('program.title') }}</h2>
-                    <p class="muted">{{ t('program.empty') }}</p>
-                </div>
-
-                    <template v-else>
-                        <div class="card">
-                        <div class="stack">
-                            <h2 style="margin:0">{{ t('program.titleWithName', { name: current.displayName || shortId(current.id) }) }}</h2>
-                            <p class="muted">{{ t('program.subtitle') }}</p>
-                        </div>
-                    </div>
-
-                    <div class="overview-grid compact-overview-grid">
-                        <div class="card">
-                            <div class="overview-card-header">
-                                <div class="stack">
-                                    <h3 style="margin:0">{{ t('program.dataTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.dataSubtitle') }}</span>
-                                </div>
-                                <div class="inline-actions">
-                                    <button class="small" type="button" @click="activeSection='plans'">{{ t('sections.plans') }}</button>
-                                    <button class="small" type="button" @click="activeSection='history'">{{ t('sections.history') }}</button>
-                                </div>
-                            </div>
-                            <div class="data-list">
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('labels.name') }}</span>
-                                    <strong>{{ current.displayName || shortId(current.id) }}</strong>
-                                </div>
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('labels.weight') }}</span>
-                                    <span>{{ formatWeight(current.weight) }}</span>
-                                </div>
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('labels.id') }}</span>
-                                    <span class="mono">{{ current.id }}</span>
-                                </div>
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('trainers.assigned') }}</span>
-                                    <div class="data-chips" v-if="current.trainers && current.trainers.length">
-                                        <span v-for="trainer in current.trainers" :key="trainer.id" class="pill">{{ trainer.name }}</span>
-                                    </div>
-                                    <span v-else class="muted small">{{ t('trainers.none') }}</span>
-                                </div>
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('program.paymentStatus') }}</span>
-                                    <span class="pill" :class="current.paid ? 'paid' : 'overdue'">
-                                        {{ current.paid ? t('payment.onTime') : t('payment.overdue') }}
-                                    </span>
-                                </div>
-                                <div class="data-row">
-                                    <span class="muted small">{{ t('program.progressLabel') }}</span>
-                                    <span>{{ progressFor(current).percent }}% ({{ progressFor(current).completed }}/{{ progressFor(current).total }})</span>
-                                </div>
-                            </div>
-                            <div class="data-block" v-if="currentTrainer">
-                                <span class="muted small">{{ t('program.coachTipTitle') }}</span>
-                                <textarea
-                                    v-model="coachTipDraft"
-                                    :placeholder="t('program.coachTipPlaceholder')"
-                                    :disabled="coachTipSaving"
-                                ></textarea>
-                                <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-                                    <button class="small" type="button" @click="saveCoachTip" :disabled="coachTipSaving">
-                                        {{ t('actions.save') }}
-                                    </button>
-                                </div>
-                                <div class="muted small" v-if="coachTipSaving">{{ t('status.savingCoachTip') }}</div>
-                            </div>
-                            <div class="data-block" v-if="currentTrainer">
-                                <span class="muted small">{{ t('program.trainerNotesTitle') }}</span>
-                                <textarea
-                                    v-model="trainerNotesDraft"
-                                    :placeholder="t('program.trainerNotesPlaceholder')"
-                                    :disabled="trainerNotesSaving"
-                                ></textarea>
-                                <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-                                    <button class="small" type="button" @click="saveTrainerNotes" :disabled="trainerNotesSaving">
-                                        {{ t('actions.save') }}
-                                    </button>
-                                </div>
-                                <div class="muted small" v-if="trainerNotesSaving">{{ t('status.savingTrainerNotes') }}</div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="overview-card-header">
-                                <div class="stack">
-                                    <h3 style="margin:0">{{ t('dashboard.feedbackTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.feedbackSubtitle') }}</span>
-                                </div>
-                                <div class="inline-actions">
-                                    <button class="small" type="button" @click="loadFeedbackEntries">{{ t('actions.refresh') }}</button>
-                                    <button class="small" type="button" @click="activeSection='feedback'">{{ t('sections.feedback') }}</button>
-                                </div>
-                            </div>
-                            <div v-if="feedbackLoading" class="muted small">{{ t('feedback.loading') }}</div>
-                            <div v-else-if="feedbackError" class="muted small">{{ feedbackError }}</div>
-                            <div v-else-if="currentFeedbackEntries.length===0" class="muted small">{{ t('program.feedbackEmpty') }}</div>
-                            <div v-else class="chat-list">
-                                <div v-for="note in currentFeedbackEntries" :key="note.id" class="chat-item">
-                                    <div class="chat-meta">
-                                        <strong>{{ note.statusLabel }}</strong>
-                                        <span class="muted small">{{ note.createdLabel }}</span>
-                                    </div>
-                                    <div class="chat-message">{{ note.message }}</div>
-                                    <div v-if="note.answerMessage" class="muted small">{{ t('feedback.answerLabel') }}: {{ note.answerMessage }}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="overview-card-header">
-                                <div class="stack">
-                                    <h3 style="margin:0">{{ t('program.calendarTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.calendarSubtitle') }}</span>
-                                </div>
-                                <button class="small" type="button" @click="loadDays">{{ t('actions.refresh') }}</button>
-                            </div>
-                            <div v-if="trainingCalendar.length===0" class="muted small">{{ t('program.calendarEmpty') }}</div>
-                            <div v-else class="calendar-grid compact-calendar-grid">
-                                <div v-for="entry in trainingCalendar" :key="entry.id" class="calendar-item calendar-item-rich" :class="{trained: entry.trained}">
-                                    <div class="stack">
-                                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-                                            <strong>{{ entry.label }}</strong>
-                                            <span class="tag" :class="{accent: entry.trained}">
-                                                {{ entry.trained ? t('program.calendarTrained') : t('program.calendarNoTraining') }}
-                                            </span>
-                                        </div>
-                                        <span v-if="entry.total" class="muted small">{{ t('program.calendarExercises', { completed: entry.completed, total: entry.total }) }}</span>
-                                        <span v-else class="muted small">{{ t('program.calendarNoExercises') }}</span>
-                                        <span v-if="entry.completedAtLabel" class="muted small">{{ entry.completedAtLabel }}</span>
-                                        <span v-if="entry.notes" class="muted small">{{ t('labels.notes') }}: {{ entry.notes }}</span>
-                                        <span v-else-if="entry.trainerExerciseNotes.length" class="muted small">{{ t('labels.notes') }}: {{ entry.trainerExerciseNotes[0] }}</span>
-                                        <span v-if="entry.traineeFeedback.length" class="muted small">{{ t('labels.traineeNotes') }}: {{ entry.traineeFeedback[0] }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="overview-card-header">
-                                <div class="stack">
-                                    <h3 style="margin:0">{{ t('program.paymentsTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.paymentsSubtitle') }}</span>
-                                </div>
-                                <button class="small" type="button" @click="loadPaymentHistory">{{ t('actions.refresh') }}</button>
-                            </div>
-                            <div v-if="loadingPayments" class="muted small">{{ t('status.loadingPayments') }}</div>
-                            <div v-else-if="paymentsError" class="muted small">{{ paymentsError }}</div>
-                            <div v-else-if="paymentHistory.length===0" class="muted small">{{ t('program.paymentsEmpty') }}</div>
-                            <div v-else class="list compact-list">
-                                <div v-for="payment in paymentHistory" :key="payment.id" class="payment-history-item">
-                                    <div class="stack">
-                                        <strong>{{ formatDate(payment.month_start) }}</strong>
-                                        <span class="muted small" v-if="payment.paid_at">{{ t('program.paidAt', { date: formatDate(payment.paid_at) }) }}</span>
-                                        <span class="muted small" v-if="payment.amount !== null && payment.amount !== undefined">
-                                            {{ t('payment.amountLabel', { amount: formatAmount(payment.amount) }) }}
-                                        </span>
-                                    </div>
-                                    <span class="pill" :class="payment.paid ? 'paid' : 'overdue'">
-                                        {{ payment.paid ? t('payment.onTime') : t('payment.overdue') }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </template>
-                </div>
-
-            </div>
-
-            <div class="row section-panel program-panel" :class="{active: activeSection==='plans'}">
-                <div class="col program-main">
-                    <div class="card" v-if="!current">
-                    <h2>{{ t('plans.title') }}</h2>
-                    <p class="muted">{{ t('plans.empty') }}</p>
-                </div>
-
-                    <template v-else>
-                    <div class="overview-grid">
-                        <div class="card plan-manager-card">
-                            <div class="overview-card-header">
-                                <div class="stack">
-                                    <h3 style="margin:0">{{ t('program.plansTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.plansSubtitle') }}</span>
-                                </div>
-                                <button class="small" type="button" @click="loadPlans">{{ t('actions.refresh') }}</button>
-                            </div>
-                            <div class="plan-manager">
-                                <div class="plan-form">
-                                    <h4 style="margin:0">{{ t('plans.addTitle') }}</h4>
-                                    <div class="plan-form-row">
-                                        <label class="stack small">
-                                            <span class="muted small">{{ t('labels.planName') }}</span>
-                                            <input v-model="newPlanName" :placeholder="t('program.planExample')" />
-                                        </label>
-                                        <label class="stack small">
-                                            <span class="muted small">{{ t('labels.status') }}</span>
-                                            <select v-model="newPlanStatus">
-                                                <option v-for="status in planStatuses" :key="status" :value="status">
-                                                    {{ planStatusLabel(status) }}
-                                                </option>
-                                            </select>
-                                        </label>
-                                        <label class="stack small">
-                                            <span class="muted small">{{ t('labels.startsAt') }}</span>
-                                            <input type="date" v-model="newPlanStartsAt" />
-                                        </label>
-                                    </div>
-                                    <label class="stack small">
-                                        <span class="muted small">{{ t('labels.notes') }}</span>
-                                        <textarea v-model="newPlanNotes" :placeholder="t('program.planNotes')"></textarea>
-                                    </label>
-                                    <div class="plan-form-actions">
-                                        <button class="small" type="button" @click="addPlan" :disabled="savingPlan">
-                                            {{ t('actions.add') }}
-                                        </button>
-                                        <button class="small" type="button" @click="resetPlanForm" :disabled="savingPlan">
-                                            {{ t('actions.clear') }}
-                                        </button>
-                                        <span v-if="savingPlan" class="muted small">{{ t('status.savingPlan') }}</span>
-                                    </div>
-                                </div>
-                                <div class="plan-list">
-                                    <h4 style="margin:0">{{ t('plans.listTitle') }}</h4>
-                                    <div v-if="plans.length===0" class="muted small">{{ t('plans.none') }}</div>
-                                    <div v-else class="plan-edit-list">
-                                        <div v-for="plan in plans" :key="plan.id" class="plan-item plan-edit-card">
-                                            <div class="stack">
-                                                <strong>{{ plan.title }}</strong>
-                                                <span class="muted small">{{ planStatusLabel(plan.status) }}</span>
-                                                <span class="muted small" v-if="plan.created_at">
-                                                    {{ t('labels.createdAt') }}: {{ formatDate(plan.created_at) }}
-                                                </span>
-                                                <span class="muted small" v-if="plan.starts_on">
-                                                    {{ t('labels.startsAt') }}: {{ formatDate(plan.starts_on) }}
-                                                </span>
-                                            </div>
-                                            <div v-if="planEdits[plan.id]" class="plan-edit-form">
-                                                <label class="stack small">
-                                                    <span class="muted small">{{ t('labels.planName') }}</span>
-                                                    <input v-model="planEdits[plan.id].name" />
-                                                </label>
-                                                <label class="stack small">
-                                                    <span class="muted small">{{ t('labels.status') }}</span>
-                                                    <select v-model="planEdits[plan.id].status">
-                                                        <option v-for="status in planStatuses" :key="status" :value="status">
-                                                            {{ planStatusLabel(status) }}
-                                                        </option>
-                                                    </select>
-                                                </label>
-                                                <label class="stack small">
-                                                    <span class="muted small">{{ t('labels.startsAt') }}</span>
-                                                    <input type="date" v-model="planEdits[plan.id].starts_on" />
-                                                </label>
-                                                <label class="stack small plan-edit-notes">
-                                                    <span class="muted small">{{ t('labels.notes') }}</span>
-                                                    <textarea v-model="planEdits[plan.id].notes"></textarea>
-                                                </label>
-                                            </div>
-                                            <div class="plan-form-actions">
-                                                <button class="small" type="button" @click="savePlan(plan)" :disabled="savingPlan">
-                                                    {{ t('actions.save') }}
-                                                </button>
-                                                <button class="small" type="button" @click="resetPlanEdit(plan)" :disabled="savingPlan">
-                                                    {{ t('actions.reset') }}
-                                                </button>
-                                                <button class="small danger" type="button" @click="deletePlan(plan)" :disabled="savingPlan">
-                                                    {{ t('actions.delete') }}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="overview-grid">
-                        <div class="card">
-                            <div class="workout-editor-header">
-                                <div class="stack">
-                                    <h3 class="workout-editor-title">{{ t('program.planBuilderTitle') }}</h3>
-                                    <span class="muted small">{{ t('program.planBuilderSubtitle') }}</span>
-                                </div>
-                                <div class="workout-editor-header-actions">
-                                    <button
-                                        class="btn workout-editor-create"
-                                        type="button"
-                                        @click="saveTemplatePlan"
-                                        :disabled="savingTemplatePlan"
-                                    >
-                                        <span class="workout-editor-create-icon">+</span>
-                                        {{ selectedTemplatePlanId ? t('actions.save') : t('actions.createWorkout') }}
-                                    </button>
-                                    <span v-if="savingTemplatePlan" class="muted small">{{ t('status.savingPlan') }}</span>
-                                    <span v-if="templatePlanLoading" class="muted small">{{ t('status.loadingPlan') }}</span>
-                                </div>
-                            </div>
-                            <div class="workout-editor-settings">
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.plan') }}</span>
-                                    <select v-model="selectedTemplatePlanId" :disabled="templatePlanLoading">
-                                        <option value="">{{ t('placeholders.newPlan') }}</option>
-                                        <option v-for="plan in plans" :key="plan.id" :value="plan.id">
-                                            {{ plan.title || t('labels.untitled') }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.planName') }}</span>
-                                    <input v-model="templatePlanName" :placeholder="t('program.planExample')" />
-                                </label>
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.days') }}</span>
-                                    <select v-model.number="templateDayCount">
-                                        <option v-for="option in templateDayOptions" :key="option" :value="option">
-                                            {{ option }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.weeks') }}</span>
-                                    <select v-model.number="templateWeekCount">
-                                        <option v-for="option in templateWeekOptions" :key="option" :value="option">
-                                            {{ option }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('labels.exercises') }}</span>
-                                    <select v-model.number="templateSlotCount">
-                                        <option v-for="option in templateExerciseOptions" :key="option" :value="option">
-                                            {{ option }}
-                                        </option>
-                                    </select>
-                                </label>
-                            </div>
-                            <div class="workout-import-panel">
-                                <label class="stack small workout-import-field">
-                                    <span class="muted small">{{ t('program.pdfImportTitle') }}</span>
-                                    <input
-                                        type="file"
-                                        accept="application/pdf"
-                                        @change="importProgramPdf"
-                                        :disabled="pdfImportLoading"
-                                    />
-                                </label>
-                                <span v-if="pdfImportLoading" class="muted small">{{ t('status.importingPdf') }}</span>
-                                <span v-else-if="pdfImportError" class="muted small">{{ pdfImportError }}</span>
-                                <span v-else-if="pdfImportSummary" class="muted small">{{ pdfImportSummary }}</span>
-                            </div>
-                            <div class="workout-editor-grid">
-                                <div class="workout-editor-column">
-                                    <div class="workout-card">
-                                        <div class="workout-card-header">
-                                            <h4>{{ t('labels.days') }}</h4>
-                                            <button
-                                                class="icon-button"
-                                                type="button"
-                                                @click="incrementTemplateDayCount"
-                                                :disabled="templateDayCount >= templateDayOptions[templateDayOptions.length - 1]"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-                                        <div class="workout-days">
-                                            <div
-                                                v-for="group in templateWeekGroups"
-                                                :key="`week-${group.week}`"
-                                                class="workout-week-group"
-                                            >
-                                                <div class="workout-week-header">
-                                                    {{ t('labels.weekNumber', { week: group.week }) }}
-                                                </div>
-                                                <button
-                                                    v-for="entry in group.days"
-                                                    :key="entry.day.id"
-                                                    class="workout-day-item"
-                                                    :class="{ active: entry.index === selectedTemplateDay }"
-                                                    type="button"
-                                                    @click="selectTemplateDay(entry.index)"
-                                                >
-                                                    <div class="stack">
-                                                        <strong>{{ templateDayLabel(entry.index) }}</strong>
-                                                        <span class="muted small">
-                                                            {{ entry.day.title || t('placeholders.workoutTitle') }}
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <label class="stack small workout-day-title">
-                                            <span class="muted small">{{ t('labels.title') }}</span>
-                                            <input v-model="activeTemplateDay.title" :placeholder="t('placeholders.workoutTitle')" />
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="workout-editor-column">
-                                    <div class="workout-card">
-                                        <div class="workout-card-header">
-                                            <h4>{{ t('labels.activities') }}</h4>
-                                            <button
-                                                class="icon-button"
-                                                type="button"
-                                                @click="incrementTemplateSlotCount"
-                                                :disabled="templateSlotCount >= templateExerciseOptions[templateExerciseOptions.length - 1]"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-                                        <div class="workout-activity-list">
-                                            <button
-                                                v-for="(slot, slotIndex) in activeTemplateSlots"
-                                                :key="`${activeTemplateDay.id}-${slotIndex}`"
-                                                class="workout-activity-item"
-                                                :class="{ active: slotIndex === selectedTemplateSlot }"
-                                                type="button"
-                                                @click="selectTemplateSlot(slotIndex)"
-                                            >
-                                                <div class="stack">
-                                                    <strong>{{ resolveTemplateSlotName(slot) || t('placeholders.exerciseName') }}</strong>
-                                                </div>
-                                                <span class="workout-activity-check" :class="{ active: slotIndex === selectedTemplateSlot }">
-                                                    ✓
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="workout-editor-column">
-                                    <div class="workout-card workout-detail-card">
-                                        <div class="workout-card-header">
-                                            <h4>{{ resolveTemplateSlotName(activeTemplateSlot) || t('labels.exercise') }}</h4>
-                                        </div>
-                                        <div class="workout-detail-image">
-                                            <span class="muted small">{{ t('labels.preview') }}</span>
-                                        </div>
-                                        <div class="workout-detail-grid">
-                                            <label class="stack small">
-                                                <span class="muted small">{{ t('labels.exercise') }}</span>
-                                                <input
-                                                    v-model="activeTemplateSlot.exercise"
-                                                    :placeholder="t('placeholders.exerciseName')"
-                                                />
-                                            </label>
-                                            <label class="stack small">
-                                                <span class="muted small">{{ t('labels.linkedExercise') }}</span>
-                                                <select v-model="activeTemplateSlot.exercise_id">
-                                                    <option value="">
-                                                        {{ t('actions.none') }}
-                                                    </option>
-                                                    <option
-                                                        v-for="exercise in exercises"
-                                                        :key="exercise.id"
-                                                        :value="exercise.id"
-                                                    >
-                                                        {{ exercise.name || exercise.slug || exercise.id }}
-                                                    </option>
-                                                </select>
-                                            </label>
-                                        </div>
-                                        <label class="stack small">
-                                            <span class="muted small">{{ t('labels.notes') }}</span>
-                                            <textarea
-                                                v-model="activeTemplateSlot.notes"
-                                                :placeholder="t('placeholders.notesOptional')"
-                                            ></textarea>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </template>
-                </div>
-            </div>
-
-            <div class="row section-panel program-panel" :class="{active: activeSection==='history'}">
-                <div class="col program-main">
-                    <div class="card" v-if="!current">
-                    <h2>{{ t('history.title') }}</h2>
-                    <p class="muted">{{ t('history.empty') }}</p>
-                </div>
-
-                    <template v-else>
-                    <div class="card">
-                        <div class="overview-card-header">
-                            <div class="stack">
-                                <h3 style="margin:0">
-                                    {{ t('history.titleWithName', { name: current.displayName || shortId(current.id) }) }}
-                                </h3>
-                                <span class="muted small">{{ t('history.subtitle') }}</span>
-                            </div>
-                            <button class="small" type="button" @click="loadMaxTests">{{ t('actions.refresh') }}</button>
-                        </div>
-                        <div class="stack" style="margin:12px 0;gap:8px">
-                            <strong>{{ t('history.addTitle') }}</strong>
-                            <div class="row" style="gap:8px;flex-wrap:wrap">
-                                <input
-                                    v-model="maxTestForm.exercise"
-                                    type="text"
-                                    :placeholder="t('history.addExercisePlaceholder')"
-                                    style="flex:2;min-width:180px"
-                                />
-                                <input
-                                    v-model="maxTestForm.value"
-                                    type="number"
-                                    min="0"
-                                    step="0.1"
-                                    :placeholder="t('history.addValuePlaceholder')"
-                                    style="flex:1;min-width:120px"
-                                />
-                                <input
-                                    v-model="maxTestForm.unit"
-                                    type="text"
-                                    :placeholder="t('history.addUnitPlaceholder')"
-                                    style="width:110px"
-                                />
-                                <input
-                                    v-model="maxTestForm.recorded_at"
-                                    type="date"
-                                    style="width:170px"
-                                />
-                                <button class="small" type="button" @click="addMaxTest" :disabled="maxTestSaving">
-                                    {{ maxTestSaving ? t('history.addSaving') : t('history.addAction') }}
-                                </button>
-                            </div>
-                        </div>
-                        <div v-if="loadingMaxTests" class="muted small">{{ t('status.loadingMaxTests') }}</div>
-                        <div v-else-if="maxTestsError" class="muted small">{{ maxTestsError }}</div>
-                        <div v-else-if="maxTestHistory.length===0" class="muted small">{{ t('history.none') }}</div>
-                        <div v-else class="history-grid">
-                            <div v-for="item in maxTestHistory" :key="item.exercise" class="card history-card">
-                                <div class="history-card-head">
-                                    <div class="stack">
-                                        <strong>{{ item.exercise }}</strong>
-                                        <span class="muted small">
-                                            {{ t('history.testsBest', { countLabel: formatCount(item.count, 'labels.testCount', 'labels.testsCount'), value: formatTestValue(item.bestValue), unit: item.unit }) }}
-                                        </span>
-                                    </div>
-                                    <span class="muted small" v-if="item.latestLabel">{{ item.latestLabel }}</span>
-                                </div>
-                                <div class="history-chart-wrap">
-                                    <div class="history-y-axis small muted">
-                                        <span>{{ formatTestValue(item.maxValue) }}</span>
-                                        <span>{{ formatTestValue(item.minValue) }}</span>
-                                    </div>
-                                    <svg
-                                        class="history-chart"
-                                        :viewBox="`0 0 ${item.chartWidth} ${item.chartHeight}`"
-                                        role="img"
-                                        :aria-label="t('history.chartAria', { exercise: item.exercise })"
-                                    >
-                                        <polyline class="history-line" :points="item.polyline"></polyline>
-                                        <circle
-                                            v-for="(point, idx) in item.points"
-                                            :key="`${item.exercise}-${idx}`"
-                                            class="history-point"
-                                            :class="{latest: idx === item.points.length - 1}"
-                                            :cx="point.x"
-                                            :cy="point.y"
-                                        ></circle>
-                                    </svg>
-                                </div>
-                                <div class="history-meta small">
-                                    <span>{{ item.minDateLabel }}</span>
-                                    <span>{{ item.maxDateLabel }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </template>
-                </div>
-            </div>
-
             <div class="section-panel exercises-panel" :class="{active: activeSection==='exercises'}">
-                <div class="overview-grid">
+                <div class="col">
                     <div class="card">
                         <div class="overview-card-header">
                             <div class="stack">
                                 <h3>{{ t('sections.exercises') }}</h3>
                                 <span class="muted small">{{ t('exercises.available') }}</span>
+                            </div>
+                            <div class="exercise-toolbar">
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('placeholders.filterExercises') }}</span>
+                                    <input v-model="exerciseFilter" :placeholder="t('placeholders.filterExercises')" />
+                                </label>
+                                <button class="small" type="button" @click="loadExercises" :disabled="loadingExercises">
+                                    {{ t('actions.refresh') }}
+                                </button>
                             </div>
                         </div>
                         <div class="exercise-form-grid">
@@ -1553,15 +984,6 @@
                             <div class="stack">
                                 <h3>{{ t('exercises.available') }}</h3>
                                 <span class="muted small">{{ t('labels.exercisesCount', { count: filteredExercises.length }) }}</span>
-                            </div>
-                            <div class="exercise-toolbar">
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('placeholders.filterExercises') }}</span>
-                                    <input v-model="exerciseFilter" :placeholder="t('placeholders.filterExercises')" />
-                                </label>
-                                <button class="small" type="button" @click="loadExercises" :disabled="loadingExercises">
-                                    {{ t('actions.refresh') }}
-                                </button>
                             </div>
                         </div>
                         <div v-if="loadingExercises" class="muted small">{{ t('status.loadingExercises') }}</div>
@@ -1625,14 +1047,23 @@
             </div>
 
             <div class="section-panel terminology-panel" :class="{active: activeSection==='terminology'}">
-                <div class="overview-grid">
+                <div class="col">
                     <div class="card">
                         <div class="overview-card-header">
                             <div class="stack">
                                 <h3>{{ t('sections.terminology') }}</h3>
                                 <span class="muted small">{{ t('terminology.subtitle') }}</span>
                             </div>
-                            <span class="pill">{{ t('terminology.localeBadge', { locale: locale.toUpperCase() }) }}</span>
+                            <div class="exercise-toolbar">
+                                <span class="pill">{{ t('terminology.localeBadge', { locale: locale.toUpperCase() }) }}</span>
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('placeholders.filterTerminology') }}</span>
+                                    <input v-model="terminologyFilter" :placeholder="t('placeholders.filterTerminology')" />
+                                </label>
+                                <button class="small" type="button" @click="loadTerminology" :disabled="loadingTerminology">
+                                    {{ t('actions.refresh') }}
+                                </button>
+                            </div>
                         </div>
                         <div class="exercise-form-grid">
                             <label class="stack small">
@@ -1667,15 +1098,6 @@
                             <div class="stack">
                                 <h3>{{ t('terminology.available') }}</h3>
                                 <span class="muted small">{{ t('labels.terminologyCount', { count: filteredTerminology.length }) }}</span>
-                            </div>
-                            <div class="exercise-toolbar">
-                                <label class="stack small">
-                                    <span class="muted small">{{ t('placeholders.filterTerminology') }}</span>
-                                    <input v-model="terminologyFilter" :placeholder="t('placeholders.filterTerminology')" />
-                                </label>
-                                <button class="small" type="button" @click="loadTerminology" :disabled="loadingTerminology">
-                                    {{ t('actions.refresh') }}
-                                </button>
                             </div>
                         </div>
                         <div v-if="loadingTerminology" class="muted small">{{ t('status.loadingTerminology') }}</div>

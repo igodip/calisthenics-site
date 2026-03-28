@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calisync Trainee</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app" class="wrap">
+    <div v-if="!session" class="auth-shell">
+        <div class="auth-card">
+            <div class="brand">
+                <span class="brand-mark">C</span>
+                <div>
+                    <h1>{{ t('app.title') }}</h1>
+                    <p class="muted">{{ t('auth.subtitle') }}</p>
+                </div>
+            </div>
+            <form class="auth-form" @submit.prevent="emailPasswordSignIn">
+                <label class="field">
+                    <span class="label">{{ t('placeholders.email') }}</span>
+                    <input v-model="email" type="email" :placeholder="t('placeholders.email')" autocomplete="username" required>
+                </label>
+                <label class="field">
+                    <span class="label">{{ t('placeholders.password') }}</span>
+                    <input v-model="password" type="password" :placeholder="t('placeholders.password')" autocomplete="current-password" required>
+                </label>
+                <p v-if="authError" class="auth-error">{{ authError }}</p>
+                <button class="btn primary" :disabled="authLoading">{{ t('actions.signIn') }}</button>
+            </form>
+        </div>
+    </div>
+
+    <div v-else class="app-shell">
+        <main class="main">
+            <div class="topbar">
+                <div>
+                    <div class="eyebrow">{{ t('sections.trainees') }}</div>
+                    <h2 class="page-title">{{ current ? (current.displayName || shortId(current.id)) : t('sections.trainees') }}</h2>
+                    <div class="muted small">{{ t('trainees.detailSubtitle') }}</div>
+                </div>
+                <div class="toolbar-secondary">
+                    <button class="btn ghost" type="button" @click="goToTraineesPage">{{ t('actions.backToTrainees') }}</button>
+                    <button
+                        class="icon-button theme-toggle"
+                        type="button"
+                        @click="toggleTheme"
+                        :aria-label="theme === 'dark' ? t('toolbar.themeLight') : t('toolbar.themeDark')"
+                        :title="theme === 'dark' ? t('toolbar.themeLight') : t('toolbar.themeDark')"
+                    >
+                        <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
+                    </button>
+                    <select v-model="locale" class="pill" :aria-label="t('toolbar.language')">
+                        <option v-for="option in languageOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <button class="btn soft" @click="signOut">{{ t('actions.signOut') }}</button>
+                </div>
+            </div>
+
+            <div v-if="!current" class="card">
+                <h2>{{ t('sections.trainees') }}</h2>
+                <p class="muted">{{ hasBootstrapped ? t('trainees.detailNotFound') : t('status.loadingExercises') }}</p>
+            </div>
+
+            <template v-else>
+                <div class="filter-row trainee-tabs">
+                    <button
+                        type="button"
+                        :class="{active: currentTraineeTab==='overview'}"
+                        @click="currentTraineeTab='overview'"
+                    >
+                        {{ t('traineeTabs.overview') }}
+                    </button>
+                    <button
+                        type="button"
+                        :class="{active: currentTraineeTab==='plans'}"
+                        @click="currentTraineeTab='plans'"
+                    >
+                        {{ t('traineeTabs.plans') }}
+                    </button>
+                    <button
+                        type="button"
+                        :class="{active: currentTraineeTab==='history'}"
+                        @click="currentTraineeTab='history'"
+                    >
+                        {{ t('traineeTabs.history') }}
+                    </button>
+                </div>
+
+                <div class="section-panel active" v-if="currentTraineeTab==='overview'">
+                    <div class="card">
+                        <div class="stack">
+                            <h2 style="margin:0">{{ t('program.titleWithName', { name: current.displayName || shortId(current.id) }) }}</h2>
+                            <p class="muted">{{ t('program.subtitle') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="overview-grid compact-overview-grid">
+                        <div class="card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('program.dataTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.dataSubtitle') }}</span>
+                                </div>
+                            </div>
+                            <div class="data-list">
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('labels.name') }}</span>
+                                    <strong>{{ current.displayName || shortId(current.id) }}</strong>
+                                </div>
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('labels.weight') }}</span>
+                                    <span>{{ formatWeight(current.weight) }}</span>
+                                </div>
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('labels.id') }}</span>
+                                    <span class="mono">{{ current.id }}</span>
+                                </div>
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('trainers.assigned') }}</span>
+                                    <div class="data-chips" v-if="current.trainers && current.trainers.length">
+                                        <span v-for="trainer in current.trainers" :key="trainer.id" class="pill">{{ trainer.name }}</span>
+                                    </div>
+                                    <span v-else class="muted small">{{ t('trainers.none') }}</span>
+                                </div>
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('program.paymentStatus') }}</span>
+                                    <span class="pill" :class="current.paid ? 'paid' : 'overdue'">
+                                        {{ current.paid ? t('payment.onTime') : t('payment.overdue') }}
+                                    </span>
+                                </div>
+                                <div class="data-row">
+                                    <span class="muted small">{{ t('program.progressLabel') }}</span>
+                                    <span>{{ progressFor(current).percent }}% ({{ progressFor(current).completed }}/{{ progressFor(current).total }})</span>
+                                </div>
+                            </div>
+                            <div class="data-block" v-if="currentTrainer">
+                                <span class="muted small">{{ t('program.coachTipTitle') }}</span>
+                                <textarea
+                                    v-model="coachTipDraft"
+                                    :placeholder="t('program.coachTipPlaceholder')"
+                                    :disabled="coachTipSaving"
+                                ></textarea>
+                                <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+                                    <button class="small" type="button" @click="saveCoachTip" :disabled="coachTipSaving">
+                                        {{ t('actions.save') }}
+                                    </button>
+                                </div>
+                                <div class="muted small" v-if="coachTipSaving">{{ t('status.savingCoachTip') }}</div>
+                            </div>
+                            <div class="data-block" v-if="currentTrainer">
+                                <span class="muted small">{{ t('program.trainerNotesTitle') }}</span>
+                                <textarea
+                                    v-model="trainerNotesDraft"
+                                    :placeholder="t('program.trainerNotesPlaceholder')"
+                                    :disabled="trainerNotesSaving"
+                                ></textarea>
+                                <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+                                    <button class="small" type="button" @click="saveTrainerNotes" :disabled="trainerNotesSaving">
+                                        {{ t('actions.save') }}
+                                    </button>
+                                </div>
+                                <div class="muted small" v-if="trainerNotesSaving">{{ t('status.savingTrainerNotes') }}</div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('dashboard.feedbackTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.feedbackSubtitle') }}</span>
+                                </div>
+                                <div class="inline-actions">
+                                    <button class="small" type="button" @click="loadFeedbackEntries">{{ t('actions.refresh') }}</button>
+                                </div>
+                            </div>
+                            <div v-if="feedbackLoading" class="muted small">{{ t('feedback.loading') }}</div>
+                            <div v-else-if="feedbackError" class="muted small">{{ feedbackError }}</div>
+                            <div v-else-if="currentFeedbackEntries.length===0" class="muted small">{{ t('program.feedbackEmpty') }}</div>
+                            <div v-else class="chat-list">
+                                <div v-for="note in currentFeedbackEntries" :key="note.id" class="chat-item">
+                                    <div class="chat-meta">
+                                        <strong>{{ note.statusLabel }}</strong>
+                                        <span class="muted small">{{ note.createdLabel }}</span>
+                                    </div>
+                                    <div class="chat-message">{{ note.message }}</div>
+                                    <div v-if="note.answerMessage" class="muted small">{{ t('feedback.answerLabel') }}: {{ note.answerMessage }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('program.calendarTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.calendarSubtitle') }}</span>
+                                </div>
+                                <div class="inline-actions">
+                                    <button class="small" type="button" @click="currentCalendarExpanded = !currentCalendarExpanded">
+                                        {{ currentCalendarExpanded ? t('actions.collapse') : t('actions.expand') }}
+                                    </button>
+                                    <button class="small" type="button" @click="loadDays">{{ t('actions.refresh') }}</button>
+                                </div>
+                            </div>
+                            <div v-if="!currentCalendarExpanded" class="muted small">
+                                {{ trainingCalendar.length
+                                    ? t('labels.daysCount', { count: trainingCalendar.length })
+                                    : t('program.calendarEmpty') }}
+                            </div>
+                            <div v-else-if="trainingCalendar.length===0" class="muted small">{{ t('program.calendarEmpty') }}</div>
+                            <div v-else class="calendar-grid compact-calendar-grid">
+                                <div v-for="entry in trainingCalendar" :key="entry.id" class="calendar-item calendar-item-rich" :class="{trained: entry.trained}">
+                                    <div class="stack">
+                                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+                                            <strong>{{ entry.label }}</strong>
+                                            <span class="tag" :class="{accent: entry.trained}">
+                                                {{ entry.trained ? t('program.calendarTrained') : t('program.calendarNoTraining') }}
+                                            </span>
+                                        </div>
+                                        <span v-if="entry.total" class="muted small">{{ t('program.calendarExercises', { completed: entry.completed, total: entry.total }) }}</span>
+                                        <span v-else class="muted small">{{ t('program.calendarNoExercises') }}</span>
+                                        <span v-if="entry.completedAtLabel" class="muted small">{{ entry.completedAtLabel }}</span>
+                                        <span v-if="entry.notes" class="muted small">{{ t('labels.notes') }}: {{ entry.notes }}</span>
+                                        <span v-else-if="entry.trainerExerciseNotes.length" class="muted small">{{ t('labels.notes') }}: {{ entry.trainerExerciseNotes[0] }}</span>
+                                        <span v-if="entry.traineeFeedback.length" class="muted small">{{ t('labels.traineeNotes') }}: {{ entry.traineeFeedback[0] }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('program.paymentsTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.paymentsSubtitle') }}</span>
+                                </div>
+                                <button class="small" type="button" @click="loadPaymentHistory">{{ t('actions.refresh') }}</button>
+                            </div>
+                            <div v-if="loadingPayments" class="muted small">{{ t('status.loadingPayments') }}</div>
+                            <div v-else-if="paymentsError" class="muted small">{{ paymentsError }}</div>
+                            <div v-else-if="paymentHistory.length===0" class="muted small">{{ t('program.paymentsEmpty') }}</div>
+                            <div v-else class="list compact-list">
+                                <div v-for="payment in paymentHistory" :key="payment.id" class="payment-history-item">
+                                    <div class="stack">
+                                        <strong>{{ formatDate(payment.month_start) }}</strong>
+                                        <span class="muted small" v-if="payment.paid_at">{{ t('program.paidAt', { date: formatDate(payment.paid_at) }) }}</span>
+                                        <span class="muted small" v-if="payment.amount !== null && payment.amount !== undefined">
+                                            {{ t('payment.amountLabel', { amount: formatAmount(payment.amount) }) }}
+                                        </span>
+                                    </div>
+                                    <span class="pill" :class="payment.paid ? 'paid' : 'overdue'">
+                                        {{ payment.paid ? t('payment.onTime') : t('payment.overdue') }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('weightHistory.title') }}</h3>
+                                    <span class="muted small">{{ t('weightHistory.subtitle') }}</span>
+                                </div>
+                                <button class="small" type="button" @click="loadWeightLogs">{{ t('actions.refresh') }}</button>
+                            </div>
+                            <div class="stack" style="margin:12px 0;gap:8px">
+                                <strong>{{ t('weightHistory.addTitle') }}</strong>
+                                <div class="row" style="gap:8px;flex-wrap:wrap">
+                                    <input
+                                        v-model="weightLogForm.weight"
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        :placeholder="t('trainees.weightPlaceholder')"
+                                        style="flex:1;min-width:140px"
+                                    />
+                                    <input
+                                        v-model="weightLogForm.recorded_at"
+                                        type="date"
+                                        style="width:170px"
+                                    />
+                                    <input
+                                        v-model="weightLogForm.notes"
+                                        type="text"
+                                        :placeholder="t('placeholders.notesOptional')"
+                                        style="flex:2;min-width:180px"
+                                    />
+                                    <button class="small" type="button" @click="addWeightLog" :disabled="weightLogSaving">
+                                        {{ weightLogSaving ? t('weightHistory.addSaving') : t('weightHistory.addAction') }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div v-if="loadingWeightLogs" class="muted small">{{ t('weightHistory.loading') }}</div>
+                            <div v-else-if="weightLogsError" class="muted small">{{ weightLogsError }}</div>
+                            <div v-else-if="!weightHistory" class="muted small">{{ t('weightHistory.empty') }}</div>
+                            <div v-else class="history-card">
+                                <div class="history-card-head">
+                                    <div class="stack">
+                                        <strong>{{ formatWeight(weightHistory.latestValue) }}</strong>
+                                        <span class="muted small">
+                                            {{ t('weightHistory.summary', {
+                                                countLabel: formatCount(weightHistory.count, 'labels.weightEntry', 'labels.weightEntries'),
+                                                delta: formatWeight(weightHistory.deltaValue)
+                                            }) }}
+                                        </span>
+                                    </div>
+                                    <span class="muted small" v-if="weightHistory.latestLabel">{{ weightHistory.latestLabel }}</span>
+                                </div>
+                                <div class="history-chart-wrap">
+                                    <div class="history-y-axis small muted">
+                                        <span>{{ formatWeight(weightHistory.maxValue) }}</span>
+                                        <span>{{ formatWeight(weightHistory.minValue) }}</span>
+                                    </div>
+                                    <svg
+                                        class="history-chart"
+                                        :viewBox="`0 0 ${weightHistory.chartWidth} ${weightHistory.chartHeight}`"
+                                        role="img"
+                                        :aria-label="t('weightHistory.chartAria')"
+                                    >
+                                        <polyline class="history-line" :points="weightHistory.polyline"></polyline>
+                                        <circle
+                                            v-for="(point, idx) in weightHistory.points"
+                                            :key="`weight-${idx}`"
+                                            class="history-point"
+                                            :class="{latest: idx === weightHistory.points.length - 1}"
+                                            :cx="point.x"
+                                            :cy="point.y"
+                                        ></circle>
+                                    </svg>
+                                </div>
+                                <div class="history-meta small">
+                                    <span>{{ weightHistory.minDateLabel }}</span>
+                                    <span>{{ weightHistory.maxDateLabel }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-panel active" v-else-if="currentTraineeTab==='plans'">
+                    <div class="overview-grid">
+                        <div class="card">
+                            <div class="workout-editor-header">
+                                <div class="stack">
+                                    <h3 class="workout-editor-title">{{ t('program.planBuilderTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.planBuilderSubtitle') }}</span>
+                                </div>
+                                <div class="workout-editor-header-actions">
+                                    <button
+                                        class="btn workout-editor-create"
+                                        type="button"
+                                        @click="saveTemplatePlan"
+                                        :disabled="savingTemplatePlan"
+                                    >
+                                        <span class="workout-editor-create-icon">+</span>
+                                        {{ selectedTemplatePlanId ? t('actions.save') : t('actions.createWorkout') }}
+                                    </button>
+                                    <span v-if="savingTemplatePlan" class="muted small">{{ t('status.savingPlan') }}</span>
+                                    <span v-if="templatePlanLoading" class="muted small">{{ t('status.loadingPlan') }}</span>
+                                </div>
+                            </div>
+                            <div class="workout-editor-settings">
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('labels.plan') }}</span>
+                                    <select v-model="selectedTemplatePlanId" :disabled="templatePlanLoading">
+                                        <option value="">{{ t('placeholders.newPlan') }}</option>
+                                        <option v-for="plan in plans" :key="plan.id" :value="plan.id">
+                                            {{ plan.title || t('labels.untitled') }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('labels.planName') }}</span>
+                                    <input v-model="templatePlanName" :placeholder="t('program.planExample')" />
+                                </label>
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('labels.days') }}</span>
+                                    <select v-model.number="templateDayCount">
+                                        <option v-for="option in templateDayOptions" :key="option" :value="option">
+                                            {{ option }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('labels.weeks') }}</span>
+                                    <select v-model.number="templateWeekCount">
+                                        <option v-for="option in templateWeekOptions" :key="option" :value="option">
+                                            {{ option }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="stack small">
+                                    <span class="muted small">{{ t('labels.exercises') }}</span>
+                                    <select v-model.number="templateSlotCount">
+                                        <option v-for="option in templateExerciseOptions" :key="option" :value="option">
+                                            {{ option }}
+                                        </option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="workout-import-panel">
+                                <label class="stack small workout-import-field">
+                                    <span class="muted small">{{ t('program.pdfImportTitle') }}</span>
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        @change="importProgramPdf"
+                                        :disabled="pdfImportLoading"
+                                    />
+                                </label>
+                                <span v-if="pdfImportLoading" class="muted small">{{ t('status.importingPdf') }}</span>
+                                <span v-else-if="pdfImportError" class="muted small">{{ pdfImportError }}</span>
+                                <span v-else-if="pdfImportSummary" class="muted small">{{ pdfImportSummary }}</span>
+                            </div>
+                            <div class="workout-editor-grid">
+                                <div class="workout-editor-column">
+                                    <div class="workout-card">
+                                        <div class="workout-card-header">
+                                            <h4>{{ t('labels.days') }}</h4>
+                                            <button
+                                                class="icon-button"
+                                                type="button"
+                                                @click="incrementTemplateDayCount"
+                                                :disabled="templateDayCount >= templateDayOptions[templateDayOptions.length - 1]"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        <div class="workout-days">
+                                            <div
+                                                v-for="group in templateWeekGroups"
+                                                :key="`week-${group.week}`"
+                                                class="workout-week-group"
+                                            >
+                                                <div class="workout-week-header">
+                                                    {{ t('labels.weekNumber', { week: group.week }) }}
+                                                </div>
+                                                <button
+                                                    v-for="entry in group.days"
+                                                    :key="entry.day.id"
+                                                    class="workout-day-item"
+                                                    :class="{ active: entry.index === selectedTemplateDay }"
+                                                    type="button"
+                                                    @click="selectTemplateDay(entry.index)"
+                                                >
+                                                    <div class="stack">
+                                                        <strong>{{ templateDayLabel(entry.index) }}</strong>
+                                                        <span class="muted small">
+                                                            {{ entry.day.title || t('placeholders.workoutTitle') }}
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <label class="stack small workout-day-title">
+                                            <span class="muted small">{{ t('labels.title') }}</span>
+                                            <input v-model="activeTemplateDay.title" :placeholder="t('placeholders.workoutTitle')" />
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="workout-editor-column">
+                                    <div class="workout-card">
+                                        <div class="workout-card-header">
+                                            <h4>{{ t('labels.activities') }}</h4>
+                                            <button
+                                                class="icon-button"
+                                                type="button"
+                                                @click="incrementTemplateSlotCount"
+                                                :disabled="templateSlotCount >= templateExerciseOptions[templateExerciseOptions.length - 1]"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        <div class="workout-activity-list">
+                                            <button
+                                                v-for="(slot, slotIndex) in activeTemplateSlots"
+                                                :key="`${activeTemplateDay.id}-${slotIndex}`"
+                                                class="workout-activity-item"
+                                                :class="{ active: slotIndex === selectedTemplateSlot }"
+                                                type="button"
+                                                @click="selectTemplateSlot(slotIndex)"
+                                            >
+                                                <div class="stack">
+                                                    <strong>{{ resolveTemplateSlotName(slot) || t('placeholders.exerciseName') }}</strong>
+                                                </div>
+                                                <span class="workout-activity-check" :class="{ active: slotIndex === selectedTemplateSlot }">
+                                                    ✓
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="workout-editor-column">
+                                    <div class="workout-card workout-detail-card">
+                                        <div class="workout-card-header">
+                                            <h4>{{ resolveTemplateSlotName(activeTemplateSlot) || t('labels.exercise') }}</h4>
+                                        </div>
+                                        <div class="workout-detail-grid">
+                                            <label class="stack small">
+                                                <span class="muted small">{{ t('labels.exercise') }}</span>
+                                                <input
+                                                    v-model="activeTemplateSlot.exercise"
+                                                    :placeholder="t('placeholders.exerciseName')"
+                                                />
+                                            </label>
+                                            <label class="stack small">
+                                                <span class="muted small">{{ t('labels.linkedExercise') }}</span>
+                                                <select v-model="activeTemplateSlot.exercise_id">
+                                                    <option value="">
+                                                        {{ t('actions.none') }}
+                                                    </option>
+                                                    <option
+                                                        v-for="exercise in exercises"
+                                                        :key="exercise.id"
+                                                        :value="exercise.id"
+                                                    >
+                                                        {{ exercise.name || exercise.slug || exercise.id }}
+                                                    </option>
+                                                </select>
+                                            </label>
+                                        </div>
+                                        <label class="stack small">
+                                            <span class="muted small">{{ t('labels.notes') }}</span>
+                                            <textarea
+                                                v-model="activeTemplateSlot.notes"
+                                                :placeholder="t('placeholders.notesOptional')"
+                                            ></textarea>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-panel active" v-else>
+                    <div class="card">
+                        <div class="overview-card-header">
+                            <div class="stack">
+                                <h3 style="margin:0">
+                                    {{ t('history.titleWithName', { name: current.displayName || shortId(current.id) }) }}
+                                </h3>
+                                <span class="muted small">{{ t('history.subtitle') }}</span>
+                            </div>
+                            <button class="small" type="button" @click="loadMaxTests">{{ t('actions.refresh') }}</button>
+                        </div>
+                        <div class="stack" style="margin:12px 0;gap:8px">
+                            <strong>{{ t('history.addTitle') }}</strong>
+                            <div class="row" style="gap:8px;flex-wrap:wrap">
+                                <input
+                                    v-model="maxTestForm.exercise"
+                                    type="text"
+                                    :placeholder="t('history.addExercisePlaceholder')"
+                                    style="flex:2;min-width:180px"
+                                />
+                                <input
+                                    v-model="maxTestForm.value"
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    :placeholder="t('history.addValuePlaceholder')"
+                                    style="flex:1;min-width:120px"
+                                />
+                                <input
+                                    v-model="maxTestForm.unit"
+                                    type="text"
+                                    :placeholder="t('history.addUnitPlaceholder')"
+                                    style="width:110px"
+                                />
+                                <input
+                                    v-model="maxTestForm.recorded_at"
+                                    type="date"
+                                    style="width:170px"
+                                />
+                                <button class="small" type="button" @click="addMaxTest" :disabled="maxTestSaving">
+                                    {{ maxTestSaving ? t('history.addSaving') : t('history.addAction') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="loadingMaxTests" class="muted small">{{ t('status.loadingMaxTests') }}</div>
+                        <div v-else-if="maxTestsError" class="muted small">{{ maxTestsError }}</div>
+                        <div v-else-if="maxTestHistory.length===0" class="muted small">{{ t('history.none') }}</div>
+                        <div v-else class="history-grid">
+                            <div v-for="item in maxTestHistory" :key="item.exercise" class="card history-card">
+                                <div class="history-card-head">
+                                    <div class="stack">
+                                        <strong>{{ item.exercise }}</strong>
+                                        <span class="muted small">
+                                            {{ t('history.testsBest', { countLabel: formatCount(item.count, 'labels.testCount', 'labels.testsCount'), value: formatTestValue(item.bestValue), unit: item.unit }) }}
+                                        </span>
+                                    </div>
+                                    <span class="muted small" v-if="item.latestLabel">{{ item.latestLabel }}</span>
+                                </div>
+                                <div class="history-chart-wrap">
+                                    <div class="history-y-axis small muted">
+                                        <span>{{ formatTestValue(item.maxValue) }}</span>
+                                        <span>{{ formatTestValue(item.minValue) }}</span>
+                                    </div>
+                                    <svg
+                                        class="history-chart"
+                                        :viewBox="`0 0 ${item.chartWidth} ${item.chartHeight}`"
+                                        role="img"
+                                        :aria-label="t('history.chartAria', { exercise: item.exercise })"
+                                    >
+                                        <polyline class="history-line" :points="item.polyline"></polyline>
+                                        <circle
+                                            v-for="(point, idx) in item.points"
+                                            :key="`${item.exercise}-${idx}`"
+                                            class="history-point"
+                                            :class="{latest: idx === item.points.length - 1}"
+                                            :cx="point.x"
+                                            :cy="point.y"
+                                        ></circle>
+                                    </svg>
+                                </div>
+                                <div class="history-meta small">
+                                    <span>{{ item.minDateLabel }}</span>
+                                    <span>{{ item.maxDateLabel }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script type="module">
+    import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.min.mjs';
+    window.pdfjsLib = pdfjsLib;
+</script>
+<script>
+    (function(){
+      function add(src){ var s=document.createElement('script'); s.src=src; s.crossOrigin='anonymous'; document.head.appendChild(s); }
+      window.addEventListener('error', function(){}, true);
+      setTimeout(function(){
+        if(!window.Vue){
+          add('https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.38/vue.global.prod.min.js');
+        }
+        if(!window.supabase || !window.supabase.createClient){
+          add('https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/supabase.min.js');
+        }
+      }, 300);
+    })();
+</script>
+<script src="./app-config.local.js"></script>
+<script type="module" src="./supabase-bridge.js"></script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
