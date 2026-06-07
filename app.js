@@ -3541,6 +3541,46 @@ import {
         }
       }
 
+      async function deleteWeightLog(log) {
+        if (!log?.id) return;
+        if (!confirm(t('confirm.deleteWeightLog'))) return;
+        const { error } = await supabase.from('trainee_weight_logs').delete().eq('id', log.id);
+        if (error) {
+          alert(t('errors.deleteWeightLog', { message: error.message }));
+          return;
+        }
+        await Promise.all([loadWeightLogs(current.value), loadUsers()]);
+        const refreshed = (users.value || []).find((entry) => entry.id === current.value.id);
+        if (refreshed) {
+          current.value = refreshed;
+        }
+      }
+
+      async function deleteMaxTest(test) {
+        if (!test?.id) return;
+        if (!confirm(t('confirm.deleteMaxTest'))) return;
+        const { error } = await supabase.from('max_tests').delete().eq('id', test.id);
+        if (error) {
+          alert(t('errors.deleteMaxTest', { message: error.message }));
+          return;
+        }
+        await loadMaxTests(current.value);
+      }
+
+      async function deleteTrainee(u) {
+        if (!u?.id) return;
+        if (!confirm(t('confirm.deleteTrainee', { name: u.displayName || shortId(u.id) }))) return;
+        const { error } = await supabase.from('trainees').delete().eq('id', u.id);
+        if (error) {
+          alert(t('errors.deleteTrainee', { message: error.message }));
+          return;
+        }
+        await loadUsers();
+        if (current.value?.id === u.id) {
+          current.value = null;
+        }
+      }
+
       async function loadPlans(u = current.value) {
         if (!u) return;
         const { data, error } = await supabase
@@ -4829,6 +4869,7 @@ import {
         selectUser,
         openTrainee,
         createTrainee,
+        deleteTrainee,
         loadTrainers,
         createTrainer,
         resetTrainerForm,
@@ -4852,8 +4893,10 @@ import {
         resetPlanForm,
         addExerciseToDay,
         addWeightLog,
+        deleteWeightLog,
         saveCoachTip,
         addMaxTest,
+        deleteMaxTest,
         saveTrainerNotes,
         assignTrainerToTrainee,
         removeTrainerAssignment,
