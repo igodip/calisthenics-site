@@ -29,7 +29,7 @@ import {
       const storedLocale = localStorage.getItem('adminLocale');
       const storedTheme = localStorage.getItem('adminTheme');
       const pageUrl = new URL(window.location.href);
-      const isTraineeDetailPage = pageUrl.pathname.endsWith('/trainee.html');
+      const isTraineeDetailPage = pageUrl.pathname.includes('/trainee.html');
       const traineeDetailId = pageUrl.searchParams.get('id');
       const locale = ref(storedLocale || fallbackLocale);
       const theme = ref(storedTheme || 'light');
