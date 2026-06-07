@@ -4540,6 +4540,13 @@ import {
         if (!day?.id) return;
         const confirmed = confirm(t('confirm.deleteDay'));
         if (!confirmed) return;
+        const { error: joinError } = await supabase
+          .from('workout_plan_days')
+          .delete()
+          .eq('day_id', day.id);
+        if (joinError) {
+          console.error(joinError);
+        }
         const { error } = await supabase.from('days').delete().eq('id', day.id);
         if (error) {
           alert(t('errors.deleteDay', { message: error.message }));
