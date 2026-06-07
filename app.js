@@ -1623,6 +1623,10 @@ import {
           const fileBuffer = await file.arrayBuffer();
           window.pdfjsLib.GlobalWorkerOptions.workerSrc =
             'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.worker.min.mjs';
+          const workerSrc = window.pdfjsLib.GlobalWorkerOptions.workerSrc;
+          if (!workerSrc || typeof workerSrc !== 'string') {
+            throw new Error(t('errors.pdfWorkerUnavailable'));
+          }
           const pdf = await window.pdfjsLib.getDocument({ data: fileBuffer }).promise;
           const importedDays = [];
           for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
