@@ -491,6 +491,7 @@
                                     <div class="muted small mono">{{ u.id }}</div>
                                 </div>
                                 <span class="badge">{{ t('trainees.badge') }}</span>
+                                    <button class="icon-button" type="button" @click="deleteTrainee(u)" :aria-label="t('actions.deleteTrainee')" :title="t('actions.deleteTrainee')">×</button>
                             </div>
                             <div class="progress-row" v-if="progressFor(u).total">
                                 <div class="progress-bar">
