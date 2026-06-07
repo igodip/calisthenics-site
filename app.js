@@ -3978,13 +3978,17 @@ import {
         };
         try {
           const answeredAt = new Date().toISOString();
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('trainee_feedbacks')
             .update({ answer_message: draft, answered_at: answeredAt })
             .eq('id', note.id)
-            .is('answered_at', null);
+            .is('answered_at', null)
+            .select();
           if (error) {
             throw new Error(error.message);
+          }
+          if (!data || data.length === 0) {
+            throw new Error(t('errors.feedbackAlreadyAnswered'));
           }
           feedbackEntries.value = (feedbackEntries.value || []).map((entry) => {
             if (entry.id !== note.id) return entry;

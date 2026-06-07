@@ -436,6 +436,7 @@ export const translations = {
       updateCoachTip: 'Failed to update coach tip.',
       updateTrainerNotes: 'Failed to update trainer notes.',
       updateFeedback: 'Failed to update feedback.',
+      feedbackAlreadyAnswered: 'This feedback was already answered.',
       trainerNotesUnavailable:
         'Trainer notes are only available for trainer accounts.',
       loadCompletedExercises: 'Failed to load completed exercises.',
@@ -904,6 +905,7 @@ export const translations = {
       updateCoachTip: 'Impossibile aggiornare il consiglio del coach.',
       updateTrainerNotes: 'Impossibile aggiornare le note del coach.',
       updateFeedback: 'Impossibile aggiornare il feedback.',
+      feedbackAlreadyAnswered: 'Questo feedback è già stato risposto.',
       trainerNotesUnavailable:
         'Le note del coach sono disponibili solo per gli account trainer.',
       loadCompletedExercises: 'Impossibile caricare gli esercizi completati.',
