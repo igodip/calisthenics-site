@@ -745,7 +745,7 @@ export const translations = {
       managementTitle: 'Gestione trainer',
       managementSubtitle: 'Registra gli account trainer e mantieni allineato il roster.',
       managementHelp:
-        'Il trainer deve esistere giA in Supabase Auth. Inserisci l’UUID dell’utente auth e il nome da mostrare in admin.',
+        'Il trainer deve esistere già in Supabase Auth. Inserisci l’UUID dell’utente auth e il nome da mostrare in admin.',
       directoryTitle: 'Elenco trainer',
       directorySubtitle: 'Rinomina o rimuovi i trainer e controlla il carico assegnato.',
       empty: 'Nessun trainer trovato.',
