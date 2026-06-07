@@ -13,6 +13,27 @@ import {
   templateSlotsPerDay,
 } from './constants.js';
 
+function showToast(message, type = 'error', duration = 5000) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <span>${message}</span>
+    <button class="toast-close" aria-label="Close">×</button>
+  `;
+  container.appendChild(el);
+  const closeBtn = el.querySelector('.toast-close');
+  const dismiss = () => {
+    el.classList.add('removing');
+    setTimeout(() => el.remove(), 200);
+  };
+  closeBtn.addEventListener('click', dismiss);
+  if (duration > 0) {
+    setTimeout(dismiss, duration);
+  }
+}
+
 (() => {
   const { createApp, ref, computed, onMounted, watch } = Vue;
 
@@ -20,7 +41,7 @@ import {
   const { supabase, error } = createSupabaseClient();
   if (!supabase) {
     console.error(error);
-    alert(getSupabaseLoadMessage(fallbackLocale));
+    showToast(getSupabaseLoadMessage(fallbackLocale));
     return;
   }
 
@@ -423,7 +444,7 @@ import {
           selectedTemplateSlot.value = 0;
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.loadDays'));
+          showToast(err.message || t('errors.loadDays'));
           resetTemplateBuilder();
         } finally {
           templatePlanLoading.value = false;
@@ -1805,12 +1826,12 @@ import {
 
       async function saveTemplatePlan() {
         if (!current.value) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         const planTitle = (templatePlanName.value || '').trim();
         if (!planTitle) {
-          alert(t('errors.planNameRequired'));
+          showToast(t('errors.planNameRequired'));
           return;
         }
         savingTemplatePlan.value = true;
@@ -1974,7 +1995,7 @@ import {
           }
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.createDay'));
+          showToast(err.message || t('errors.createDay'));
         } finally {
           savingTemplatePlan.value = false;
         }
@@ -2130,7 +2151,7 @@ import {
           currentTrainer.value = trainerRow || null;
         } catch (error) {
           console.error(error);
-          alert(t('errors.loadAccess', { message: error.message }));
+          showToast(t('errors.loadAccess', { message: error.message }));
           currentAdmin.value = null;
           currentTrainer.value = null;
         }
@@ -2179,7 +2200,7 @@ import {
           trainers.value = [];
           trainerDirectoryError.value =
             error.message || t('errors.loadTrainers');
-          alert(t('errors.loadTrainers', { message: error.message }));
+          showToast(t('errors.loadTrainers', { message: error.message }));
         } finally {
           loadingTrainers.value = false;
         }
@@ -2207,15 +2228,15 @@ import {
         const id = normalizeUuid(trainerForm.value.id);
         const name = (trainerForm.value.name || '').trim();
         if (!id) {
-          alert(t('errors.trainerIdRequired'));
+          showToast(t('errors.trainerIdRequired'));
           return;
         }
         if (!isUuid(id)) {
-          alert(t('errors.trainerIdInvalid'));
+          showToast(t('errors.trainerIdInvalid'));
           return;
         }
         if (!name) {
-          alert(t('errors.trainerNameRequired'));
+          showToast(t('errors.trainerNameRequired'));
           return;
         }
         creatingTrainer.value = true;
@@ -2228,7 +2249,7 @@ import {
           await Promise.all([loadTrainers(), loadUsers()]);
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.createTrainer'));
+          showToast(error.message || t('errors.createTrainer'));
         } finally {
           creatingTrainer.value = false;
         }
@@ -2240,7 +2261,7 @@ import {
         }
         const nextName = (trainerEdits.value[trainer.id]?.name || '').trim();
         if (!nextName) {
-          alert(t('errors.trainerNameRequired'));
+          showToast(t('errors.trainerNameRequired'));
           return;
         }
         trainerSaving.value = {
@@ -2258,7 +2279,7 @@ import {
           await Promise.all([loadTrainers(), loadUsers()]);
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.updateTrainer'));
+          showToast(error.message || t('errors.updateTrainer'));
         } finally {
           trainerSaving.value = {
             ...trainerSaving.value,
@@ -2300,7 +2321,7 @@ import {
           await Promise.all([loadTrainers(), loadUsers()]);
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.deleteTrainer'));
+          showToast(error.message || t('errors.deleteTrainer'));
         } finally {
           trainerSaving.value = {
             ...trainerSaving.value,
@@ -2313,7 +2334,7 @@ import {
         if (creatingTrainee.value) return;
         const name = (traineeForm.value.name || '').trim();
         if (!name) {
-          alert(t('errors.traineeNameRequired'));
+          showToast(t('errors.traineeNameRequired'));
           return;
         }
         const rawWeight = traineeForm.value.weight;
@@ -2325,7 +2346,7 @@ import {
           normalizedWeight !== null &&
           (!Number.isFinite(normalizedWeight) || normalizedWeight <= 0)
         ) {
-          alert(t('errors.traineeWeightInvalid'));
+          showToast(t('errors.traineeWeightInvalid'));
           return;
         }
         creatingTrainee.value = true;
@@ -2352,7 +2373,7 @@ import {
           }
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.createTrainee'));
+          showToast(error.message || t('errors.createTrainee'));
         } finally {
           creatingTrainee.value = false;
         }
@@ -2579,13 +2600,13 @@ import {
         if (creatingExercise.value) return;
         const name = (exerciseForm.value.name || '').trim();
         if (!name) {
-          alert(t('errors.exerciseNameRequired'));
+          showToast(t('errors.exerciseNameRequired'));
           return;
         }
         const slugInput = (exerciseForm.value.slug || '').trim();
         const slug = slugInput || normalizeExerciseSlug(name);
         if (!slug) {
-          alert(t('errors.exerciseNameRequired'));
+          showToast(t('errors.exerciseNameRequired'));
           return;
         }
         const difficulty =
@@ -2606,7 +2627,7 @@ import {
           await loadExercises();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.createExercise'));
+          showToast(error.message || t('errors.createExercise'));
         } finally {
           creatingExercise.value = false;
         }
@@ -2615,17 +2636,17 @@ import {
         if (creatingTerminology.value) return;
         const termKey = (terminologyForm.value.term_key || '').trim();
         if (!termKey) {
-          alert(t('errors.terminologyKeyRequired'));
+          showToast(t('errors.terminologyKeyRequired'));
           return;
         }
         const title = (terminologyForm.value.title || '').trim();
         if (!title) {
-          alert(t('errors.terminologyTitleRequired'));
+          showToast(t('errors.terminologyTitleRequired'));
           return;
         }
         const description = (terminologyForm.value.description || '').trim();
         if (!description) {
-          alert(t('errors.terminologyDescriptionRequired'));
+          showToast(t('errors.terminologyDescriptionRequired'));
           return;
         }
         const sortOrder = Number(terminologyForm.value.sort_order || 1);
@@ -2645,7 +2666,7 @@ import {
           await loadTerminology();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.createTerminology'));
+          showToast(error.message || t('errors.createTerminology'));
         } finally {
           creatingTerminology.value = false;
         }
@@ -2657,13 +2678,13 @@ import {
         const form = exerciseEdits.value[exercise.id] || {};
         const name = (form.name || '').trim();
         if (!name) {
-          alert(t('errors.exerciseNameRequired'));
+          showToast(t('errors.exerciseNameRequired'));
           return;
         }
         const slugInput = (form.slug || '').trim();
         const slug = slugInput || normalizeExerciseSlug(name);
         if (!slug) {
-          alert(t('errors.exerciseNameRequired'));
+          showToast(t('errors.exerciseNameRequired'));
           return;
         }
         const difficulty = (form.difficulty || '').trim() || 'beginner';
@@ -2688,7 +2709,7 @@ import {
           await loadExercises();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.updateExercise'));
+          showToast(error.message || t('errors.updateExercise'));
         } finally {
           exerciseSaving.value = {
             ...exerciseSaving.value,
@@ -2702,17 +2723,17 @@ import {
         const form = terminologyEdits.value[entry.id] || {};
         const termKey = (form.term_key || '').trim();
         if (!termKey) {
-          alert(t('errors.terminologyKeyRequired'));
+          showToast(t('errors.terminologyKeyRequired'));
           return;
         }
         const title = (form.title || '').trim();
         if (!title) {
-          alert(t('errors.terminologyTitleRequired'));
+          showToast(t('errors.terminologyTitleRequired'));
           return;
         }
         const description = (form.description || '').trim();
         if (!description) {
-          alert(t('errors.terminologyDescriptionRequired'));
+          showToast(t('errors.terminologyDescriptionRequired'));
           return;
         }
         const sortOrder = Number(form.sort_order || 1);
@@ -2736,7 +2757,7 @@ import {
           await loadTerminology();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.updateTerminology'));
+          showToast(error.message || t('errors.updateTerminology'));
         } finally {
           terminologySaving.value = {
             ...terminologySaving.value,
@@ -2768,7 +2789,7 @@ import {
           await loadExercises();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.deleteExercise'));
+          showToast(error.message || t('errors.deleteExercise'));
         } finally {
           exerciseSaving.value = {
             ...exerciseSaving.value,
@@ -2799,7 +2820,7 @@ import {
           await loadTerminology();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.deleteTerminology'));
+          showToast(error.message || t('errors.deleteTerminology'));
         } finally {
           terminologySaving.value = {
             ...terminologySaving.value,
@@ -2826,7 +2847,7 @@ import {
         });
         if (error) {
           console.error(error);
-          alert(t('errors.loadTrainees', { message: error.message }));
+          showToast(t('errors.loadTrainees', { message: error.message }));
           return;
         }
 
@@ -2845,7 +2866,7 @@ import {
             .in('trainee_id', traineeIds);
           if (paymentError) {
             console.error(paymentError);
-            alert(
+            showToast(
               t('errors.loadPayments', {
                 message: paymentError.message,
               }),
@@ -3074,7 +3095,7 @@ import {
           await loadUsers();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.assignTrainer'));
+          showToast(error.message || t('errors.assignTrainer'));
         } finally {
           trainerAssignmentSaving.value = {
             ...trainerAssignmentSaving.value,
@@ -3101,7 +3122,7 @@ import {
           await loadUsers();
         } catch (error) {
           console.error(error);
-          alert(error.message || t('errors.removeTrainer'));
+          showToast(error.message || t('errors.removeTrainer'));
         } finally {
           trainerAssignmentSaving.value = {
             ...trainerAssignmentSaving.value,
@@ -3148,7 +3169,7 @@ import {
           if (target && 'checked' in target) {
             target.checked = previousPaid;
           }
-          alert(err.message || t('errors.updatePayment'));
+          showToast(err.message || t('errors.updatePayment'));
         } finally {
           paymentSaving.value = { ...paymentSaving.value, [u.id]: false };
         }
@@ -3206,7 +3227,7 @@ import {
           await loadPaymentTrends();
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updatePayment'));
+          showToast(err.message || t('errors.updatePayment'));
         } finally {
           paymentAmountSaving.value = {
             ...paymentAmountSaving.value,
@@ -3305,7 +3326,7 @@ import {
           traineeProgress.value = progress;
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.loadProgress'));
+          showToast(err.message || t('errors.loadProgress'));
         } finally {
           loadingProgress.value = false;
         }
@@ -3502,12 +3523,12 @@ import {
 
       async function addWeightLog() {
         if (!current.value?.id) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         const weight = Number(weightLogForm.value.weight);
         if (!Number.isFinite(weight) || weight <= 0) {
-          alert(t('errors.traineeWeightInvalid'));
+          showToast(t('errors.traineeWeightInvalid'));
           return;
         }
         weightLogSaving.value = true;
@@ -3535,7 +3556,7 @@ import {
           }
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.addWeightLog'));
+          showToast(err.message || t('errors.addWeightLog'));
         } finally {
           weightLogSaving.value = false;
         }
@@ -3546,7 +3567,7 @@ import {
         if (!confirm(t('confirm.deleteWeightLog'))) return;
         const { error } = await supabase.from('trainee_weight_logs').delete().eq('id', log.id);
         if (error) {
-          alert(t('errors.deleteWeightLog', { message: error.message }));
+          showToast(t('errors.deleteWeightLog', { message: error.message }));
           return;
         }
         await Promise.all([loadWeightLogs(current.value), loadUsers()]);
@@ -3561,7 +3582,7 @@ import {
         if (!confirm(t('confirm.deleteMaxTest'))) return;
         const { error } = await supabase.from('max_tests').delete().eq('id', test.id);
         if (error) {
-          alert(t('errors.deleteMaxTest', { message: error.message }));
+          showToast(t('errors.deleteMaxTest', { message: error.message }));
           return;
         }
         await loadMaxTests(current.value);
@@ -3572,7 +3593,7 @@ import {
         if (!confirm(t('confirm.deleteTrainee', { name: u.displayName || shortId(u.id) }))) return;
         const { error } = await supabase.from('trainees').delete().eq('id', u.id);
         if (error) {
-          alert(t('errors.deleteTrainee', { message: error.message }));
+          showToast(t('errors.deleteTrainee', { message: error.message }));
           return;
         }
         await loadUsers();
@@ -3591,7 +3612,7 @@ import {
           .order('created_at', { ascending: false });
         if (error) {
           console.error(error);
-          alert(t('errors.loadPlans', { message: error.message }));
+          showToast(t('errors.loadPlans', { message: error.message }));
           return;
         }
         plans.value = data || [];
@@ -3626,7 +3647,7 @@ import {
           .order('day_code', { ascending: true })
           .order('position', { ascending: true, referencedTable: 'day_exercises' });
         if (error) {
-          alert(t('errors.loadDays', { message: error.message }));
+          showToast(t('errors.loadDays', { message: error.message }));
           return;
         }
         days.value = data || [];
@@ -3693,11 +3714,11 @@ import {
 
       async function saveCoachTip() {
         if (!current.value) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         if (!currentTrainer.value?.id) {
-          alert(t('errors.coachTipUnavailable'));
+          showToast(t('errors.coachTipUnavailable'));
           return;
         }
         coachTipSaving.value = true;
@@ -3721,7 +3742,7 @@ import {
           );
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updateCoachTip'));
+          showToast(err.message || t('errors.updateCoachTip'));
         } finally {
           coachTipSaving.value = false;
         }
@@ -3729,22 +3750,22 @@ import {
 
       async function addMaxTest() {
         if (!current.value?.id) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         const exercise = maxTestForm.value.exercise.trim();
         const value = Number(maxTestForm.value.value);
         const unit = maxTestForm.value.unit.trim();
         if (!exercise) {
-          alert(t('errors.maxTestExerciseRequired'));
+          showToast(t('errors.maxTestExerciseRequired'));
           return;
         }
         if (!Number.isFinite(value) || value <= 0) {
-          alert(t('errors.maxTestValueInvalid'));
+          showToast(t('errors.maxTestValueInvalid'));
           return;
         }
         if (!unit) {
-          alert(t('errors.maxTestUnitRequired'));
+          showToast(t('errors.maxTestUnitRequired'));
           return;
         }
 
@@ -3770,7 +3791,7 @@ import {
           await loadMaxTests(current.value);
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.addMaxTest'));
+          showToast(err.message || t('errors.addMaxTest'));
         } finally {
           maxTestSaving.value = false;
         }
@@ -3778,11 +3799,11 @@ import {
 
       async function saveTrainerNotes() {
         if (!current.value) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         if (!currentTrainer.value?.id) {
-          alert(t('errors.trainerNotesUnavailable'));
+          showToast(t('errors.trainerNotesUnavailable'));
           return;
         }
         trainerNotesSaving.value = true;
@@ -3805,7 +3826,7 @@ import {
           );
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updateTrainerNotes'));
+          showToast(err.message || t('errors.updateTrainerNotes'));
         } finally {
           trainerNotesSaving.value = false;
         }
@@ -3883,7 +3904,7 @@ import {
           );
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updateFeedback'));
+          showToast(err.message || t('errors.updateFeedback'));
         } finally {
           dashboardNoteClosing.value = {
             ...dashboardNoteClosing.value,
@@ -3998,7 +4019,7 @@ import {
           }
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updateFeedback'));
+          showToast(err.message || t('errors.updateFeedback'));
         } finally {
           feedbackUpdateSaving.value = {
             ...feedbackUpdateSaving.value,
@@ -4013,7 +4034,7 @@ import {
         }
         const draft = (feedbackReplyDrafts.value[note.id] || '').trim();
         if (!draft) {
-          alert(t('feedback.answerRequired'));
+          showToast(t('feedback.answerRequired'));
           return;
         }
         feedbackReplySaving.value = {
@@ -4049,7 +4070,7 @@ import {
           };
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updateFeedback'));
+          showToast(err.message || t('errors.updateFeedback'));
         } finally {
           feedbackReplySaving.value = {
             ...feedbackReplySaving.value,
@@ -4308,12 +4329,12 @@ import {
 
       async function addPlan() {
         if (!current.value) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         const title = (newPlanName.value || '').trim();
         if (!title) {
-          alert(t('errors.planNameRequired'));
+          showToast(t('errors.planNameRequired'));
           return;
         }
         savingPlan.value = true;
@@ -4333,7 +4354,7 @@ import {
           await loadPlans();
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.createPlan'));
+          showToast(err.message || t('errors.createPlan'));
         } finally {
           savingPlan.value = false;
         }
@@ -4341,13 +4362,13 @@ import {
 
       async function addDay() {
         if (!current.value) {
-          alert(t('errors.selectTrainee'));
+          showToast(t('errors.selectTrainee'));
           return;
         }
         const week = Number(newDayWeek.value || 1);
         const dayCode = (newDayCode.value || '').trim();
         if (!dayCode) {
-          alert(t('errors.dayCodeRequired'));
+          showToast(t('errors.dayCodeRequired'));
           return;
         }
         addingDay.value = true;
@@ -4376,7 +4397,7 @@ import {
               .eq('plan_id', planId);
             if (positionError) {
               console.error(positionError);
-              alert('Plan association failed: ' + positionError.message);
+              showToast('Plan association failed: ' + positionError.message);
             } else {
               const numericPositions = (positions || [])
                 .map((row) => Number(row.position || 0))
@@ -4392,7 +4413,7 @@ import {
                 });
               if (linkError) {
                 console.error(linkError);
-                alert('Plan association failed: ' + linkError.message);
+                showToast('Plan association failed: ' + linkError.message);
               }
             }
           }
@@ -4400,7 +4421,7 @@ import {
           await loadDays();
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.createDay'));
+          showToast(err.message || t('errors.createDay'));
         } finally {
           addingDay.value = false;
         }
@@ -4408,13 +4429,13 @@ import {
 
       async function savePlan(plan) {
         if (!plan?.id) {
-          alert(t('errors.missingPlan'));
+          showToast(t('errors.missingPlan'));
           return;
         }
         const form = planEdits.value[plan.id] || {};
         const title = (form.name || '').trim();
         if (!title) {
-          alert(t('errors.planNameRequired'));
+          showToast(t('errors.planNameRequired'));
           return;
         }
         savingPlan.value = true;
@@ -4435,7 +4456,7 @@ import {
           await loadPlans();
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.updatePlan'));
+          showToast(err.message || t('errors.updatePlan'));
         } finally {
           savingPlan.value = false;
         }
@@ -4500,7 +4521,7 @@ import {
           await Promise.all([loadPlans(), loadDays()]);
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.deletePlan'));
+          showToast(err.message || t('errors.deletePlan'));
         } finally {
           savingPlan.value = false;
         }
@@ -4508,18 +4529,18 @@ import {
 
       async function addExerciseToDay(day) {
         if (!day?.id) {
-          alert(t('errors.missingDay'));
+          showToast(t('errors.missingDay'));
           return;
         }
         ensureSelection(day.id);
         const selection = exerciseSelection.value[day.id];
         if (!hasDayExerciseContent(selection)) {
-          alert(t('errors.emptyActivity'));
+          showToast(t('errors.emptyActivity'));
           return;
         }
         const resolved = normalizeDayExerciseReference(selection);
         if (resolved.unresolved) {
-          alert(t('errors.chooseExercise'));
+          showToast(t('errors.chooseExercise'));
           return;
         }
         addingExercise.value = true;
@@ -4549,7 +4570,7 @@ import {
           await loadDays();
         } catch (err) {
           console.error(err);
-          alert(err.message || t('errors.addExercise'));
+          showToast(err.message || t('errors.addExercise'));
         } finally {
           addingExercise.value = false;
         }
@@ -4557,14 +4578,14 @@ import {
 
       async function saveDay(day) {
         if (!day?.id) {
-          alert(t('errors.missingDay'));
+          showToast(t('errors.missingDay'));
           return;
         }
         const form = dayEdits.value[day.id] || {};
         const week = Number(form.week || 1);
         const dayCode = (form.day_code || '').trim();
         if (!dayCode) {
-          alert(t('errors.dayCodeRequired'));
+          showToast(t('errors.dayCodeRequired'));
           return;
         }
         const payload = {
@@ -4578,7 +4599,7 @@ import {
           .update(payload)
           .eq('id', day.id);
         if (error) {
-          alert(t('errors.updateDay', { message: error.message }));
+          showToast(t('errors.updateDay', { message: error.message }));
           return;
         }
         await loadDays();
@@ -4597,7 +4618,7 @@ import {
         }
         const { error } = await supabase.from('days').delete().eq('id', day.id);
         if (error) {
-          alert(t('errors.deleteDay', { message: error.message }));
+          showToast(t('errors.deleteDay', { message: error.message }));
           return;
         }
         await loadDays();
@@ -4605,7 +4626,7 @@ import {
 
       async function saveDayExercise(ex) {
         if (!ex?.id) {
-          alert(t('errors.missingDayExercise'));
+          showToast(t('errors.missingDayExercise'));
           return;
         }
         const form = dayExerciseEdits.value[ex.id] || {};
@@ -4623,7 +4644,7 @@ import {
             exercise_id: form.exercise_id,
           });
           if (resolved.unresolved) {
-            alert(t('errors.chooseExercise'));
+            showToast(t('errors.chooseExercise'));
             return;
           }
           payload.exercise = resolved.exercise;
@@ -4634,7 +4655,7 @@ import {
           .update(payload)
           .eq('id', ex.id);
         if (error) {
-          alert(t('errors.updateDayExercise', { message: error.message }));
+          showToast(t('errors.updateDayExercise', { message: error.message }));
           return;
         }
         await loadDays();
@@ -4649,7 +4670,7 @@ import {
           .delete()
           .eq('id', ex.id);
         if (error) {
-          alert(t('errors.deleteDayExercise', { message: error.message }));
+          showToast(t('errors.deleteDayExercise', { message: error.message }));
           return;
         }
         await loadDays();
