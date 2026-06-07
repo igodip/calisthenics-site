@@ -3795,7 +3795,7 @@ import {
             error = fallback.error;
           }
           if (error) {
-            throw new Error(t('errors.loadDays', { message: error.message }));
+            throw new Error(t('errors.loadFeedback', { message: error.message }));
           }
           dashboardNotes.value = (data || []).map((row) => ({
             id: row.id,
@@ -3809,7 +3809,7 @@ import {
         } catch (err) {
           console.error(err);
           dashboardNotes.value = [];
-          dashboardNotesError.value = err.message || t('errors.loadDays');
+          dashboardNotesError.value = err.message || t('errors.loadFeedback');
         } finally {
           dashboardNotesLoading.value = false;
         }
@@ -3875,7 +3875,7 @@ import {
             error = fallback.error;
           }
           if (error) {
-            throw new Error(t('errors.loadDays', { message: error.message }));
+            throw new Error(t('errors.loadFeedback', { message: error.message }));
           }
           feedbackEntries.value = (data || []).map((row) => ({
             id: row.id,
@@ -3901,7 +3901,7 @@ import {
         } catch (err) {
           console.error(err);
           feedbackEntries.value = [];
-          feedbackError.value = err.message || t('errors.loadDays');
+          feedbackError.value = err.message || t('errors.loadFeedback');
         } finally {
           feedbackLoading.value = false;
         }
