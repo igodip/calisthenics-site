@@ -1897,7 +1897,6 @@ import {
               notes: null,
             }),
           );
-          console.log(dayPayloads);
           const { data: dayRows, error: dayError } = await supabase
             .from('days')
             .insert(dayPayloads)
@@ -3668,10 +3667,6 @@ import {
           if (error) {
             throw new Error(error.message);
           }
-
-          console.log(current.value.id);
-          console.log(currentTrainer.value.id);
-          console.log(nextTip);
 
           current.value = {
             ...current.value,
