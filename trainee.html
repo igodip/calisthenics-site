@@ -300,6 +300,16 @@
                             <div v-else-if="weightLogsError" class="muted small">{{ weightLogsError }}</div>
                             <div v-else-if="!weightHistory" class="muted small">{{ t('weightHistory.empty') }}</div>
                             <div v-else class="history-card">
+                                <div class="list" style="margin:12px 0 0">
+                                    <div v-for="log in weightLogs" :key="log.id" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;gap:8px">
+                                        <div>
+                                            <strong>{{ formatWeight(log.weight) }}</strong>
+                                            <span class="muted small" v-if="log.recorded_at">{{ log.recorded_at }}</span>
+                                            <span class="muted small" v-if="log.notes"> • {{ log.notes }}</span>
+                                        </div>
+                                        <button class="icon-button small" type="button" @click="deleteWeightLog(log)" :aria-label="t('actions.delete')" :title="t('actions.delete')">×</button>
+                                    </div>
+                                </div>
                                 <div class="history-card-head">
                                     <div class="stack">
                                         <strong>{{ formatWeight(weightHistory.latestValue) }}</strong>
@@ -586,7 +596,18 @@
                         <div v-if="loadingMaxTests" class="muted small">{{ t('status.loadingMaxTests') }}</div>
                         <div v-else-if="maxTestsError" class="muted small">{{ maxTestsError }}</div>
                         <div v-else-if="maxTestHistory.length===0" class="muted small">{{ t('history.none') }}</div>
-                        <div v-else class="history-grid">
+                        <div v-else>
+                            <div class="list" style="margin:12px 0">
+                                <div v-for="test in maxTests" :key="test.id" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;gap:8px">
+                                    <div>
+                                        <strong>{{ test.exercise }}</strong>
+                                        <span class="muted small">{{ formatTestValue(test.value) }} {{ test.unit }}</span>
+                                        <span class="muted small" v-if="test.recorded_at"> • {{ test.recorded_at }}</span>
+                                    </div>
+                                    <button class="icon-button small" type="button" @click="deleteMaxTest(test)" :aria-label="t('actions.delete')" :title="t('actions.delete')">×</button>
+                                </div>
+                            </div>
+                            <div class="history-grid">
                             <div v-for="item in maxTestHistory" :key="item.exercise" class="card history-card">
                                 <div class="history-card-head">
                                     <div class="stack">
@@ -623,6 +644,8 @@
                                     <span>{{ item.minDateLabel }}</span>
                                     <span>{{ item.maxDateLabel }}</span>
                                 </div>
+                            </div>
+                        </div>
                             </div>
                         </div>
                     </div>
