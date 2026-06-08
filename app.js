@@ -3470,7 +3470,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadMaxTests(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         loadingMaxTests.value = true;
         maxTestsError.value = '';
         try {
@@ -3498,7 +3498,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadWeightLogs(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         loadingWeightLogs.value = true;
         weightLogsError.value = '';
         try {
@@ -3603,7 +3603,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadPlans(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         const { data, error } = await supabase
           .from('workout_plans')
           .select('id, title, status, starts_on, notes, trainee_id, created_at')
@@ -3629,7 +3629,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadDays(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         const { data, error } = await supabase
           .from('days')
           .select(`
@@ -3664,7 +3664,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadPaymentHistory(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         loadingPayments.value = true;
         paymentsError.value = '';
         try {
@@ -3687,7 +3687,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function loadCompletedExercises(u = current.value) {
-        if (!u) return;
+        if (!u || !u.id) return;
         loadingCompletedExercises.value = true;
         completedExercisesError.value = '';
         try {
