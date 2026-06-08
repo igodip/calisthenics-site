@@ -1825,7 +1825,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function saveTemplatePlan() {
-        if (!current.value) {
+        if (!current.value?.id) {
           showToast(t('errors.selectTrainee'));
           return;
         }
@@ -3713,7 +3713,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function saveCoachTip() {
-        if (!current.value) {
+        if (!current.value?.id) {
           showToast(t('errors.selectTrainee'));
           return;
         }
@@ -3798,7 +3798,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function saveTrainerNotes() {
-        if (!current.value) {
+        if (!current.value?.id) {
           showToast(t('errors.selectTrainee'));
           return;
         }
@@ -4328,7 +4328,7 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       async function addPlan() {
-        if (!current.value) {
+        if (!current.value?.id) {
           showToast(t('errors.selectTrainee'));
           return;
         }
