@@ -1998,8 +1998,19 @@ button.ghost{
     font-size:13px;
   }
 
+  input,
+  select,
+  textarea{
+    /* Prevent iOS from zooming the page when a form control receives focus. */
+    font-size:16px;
+  }
+
   .main{
-    padding:12px;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
     gap:12px;
   }
 
@@ -2041,6 +2052,55 @@ button.ghost{
   .theme-toggle{
     width:42px;
     height:42px;
+  }
+
+  .nav{
+    scroll-snap-type:x proximity;
+    scroll-padding-inline:12px;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .nav button{
+    min-height:42px;
+    scroll-snap-align:start;
+  }
+
+  button.small,
+  .btn{
+    min-height:42px;
+  }
+
+  .overview-card-header,
+  .dashboard-card-header,
+  .history-header,
+  .exercise-toolbar,
+  .inline-actions,
+  .exercise-actions,
+  .payment-actions{
+    align-items:stretch;
+  }
+
+  .overview-card-header,
+  .dashboard-card-header,
+  .history-header{
+    flex-direction:column;
+  }
+
+  .exercise-toolbar > *,
+  .inline-actions > *,
+  .exercise-actions > *,
+  .payment-actions > *{
+    flex:1 1 140px;
+  }
+
+  .scroll-area,
+  .plan-builder-table-wrap{
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-inline:contain;
+  }
+
+  .mono{
+    overflow-wrap:anywhere;
   }
 
   .sidebar-footer{
