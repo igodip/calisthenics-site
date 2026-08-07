@@ -2281,16 +2281,6 @@ button.ghost{
   min-width:0;
 }
 
-.section-panel.trainee-overview-section,
-.section-panel.trainee-plan-section,
-.section-panel.dashboard-panel,
-.section-panel.exercises-panel,
-.section-panel.feedback-panel,
-.section-panel.payments-panel,
-.section-panel.terminology-panel {
-  display:block;
-}
-
 /* Brand without the -mark suffix used as a layout wrapper in some templates. */
 .brand:not(.brand-mark) {
   display:flex;
