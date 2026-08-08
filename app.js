@@ -93,7 +93,24 @@ function showToast(message, type = 'error', duration = 5000) {
       const authLoading = ref(false);
       const authError = ref('');
       const search = ref('');
-      const activeSection = ref(isTraineeDetailPage ? 'trainees' : 'dashboard');
+      const sectionIds = [
+        'dashboard',
+        'feedback',
+        'trainees',
+        'trainers',
+        'payments',
+        'exercises',
+        'terminology',
+      ];
+      const requestedSection = window.location.hash.replace('#', '');
+      const activeSection = ref(
+        isTraineeDetailPage
+          ? 'trainees'
+          : sectionIds.includes(requestedSection)
+            ? requestedSection
+            : 'dashboard',
+      );
+      const navigationOpen = ref(false);
       const paymentFilter = ref('all');
       const currentAdmin = ref(null);
       const currentTrainer = ref(null);
@@ -268,6 +285,14 @@ function showToast(message, type = 'error', duration = 5000) {
       const pdfImportLoading = ref(false);
       const pdfImportError = ref('');
       const pdfImportSummary = ref('');
+      const sectionGroup = computed(() => {
+        if (['dashboard', 'feedback'].includes(activeSection.value)) return 'workspace';
+        if (['trainees', 'trainers', 'payments'].includes(activeSection.value)) return 'people';
+        return 'library';
+      });
+      const sectionDescription = computed(() =>
+        t(`navigation.descriptions.${activeSection.value}`),
+      );
       watch(
         [templateDayCount, templateWeekCount, templateSlotCount],
         ([nextCount, nextWeeks, nextSlots]) => {
@@ -309,6 +334,17 @@ function showToast(message, type = 'error', duration = 5000) {
           await Promise.all([loadPlans(current.value), loadDays(current.value)]);
         }
       });
+
+      function navigateToSection(section) {
+        if (!sectionIds.includes(section)) return;
+        if (section === 'trainers' && !canAssignTrainers.value) return;
+        activeSection.value = section;
+        navigationOpen.value = false;
+        if (!isTraineeDetailPage && window.location.hash !== `#${section}`) {
+          window.history.pushState(null, '', `#${section}`);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
 
       function buildTemplateDays(count, slots, existing) {
         const list = [];
@@ -2100,11 +2136,14 @@ function showToast(message, type = 'error', duration = 5000) {
       }
 
       function goToTraineesPage() {
-        window.location.href = './index.html';
+        window.location.href = './index.html#trainees';
       }
 
       async function bootstrap() {
         await loadAccess();
+        if (!isTraineeDetailPage && activeSection.value === 'trainers' && !canAssignTrainers.value) {
+          navigateToSection('dashboard');
+        }
         if (canAssignTrainers.value) {
           await loadTrainers();
         }
@@ -4679,6 +4718,14 @@ function showToast(message, type = 'error', duration = 5000) {
       onMounted(async () => {
         updateDocumentLanguage();
         applyDocumentTheme();
+        window.addEventListener('hashchange', () => {
+          if (isTraineeDetailPage) return;
+          const nextSection = window.location.hash.replace('#', '');
+          if (sectionIds.includes(nextSection)) {
+            activeSection.value = nextSection;
+            navigationOpen.value = false;
+          }
+        });
         const {
           data: { session: sess },
         } = await supabase.auth.getSession();
@@ -4713,6 +4760,9 @@ function showToast(message, type = 'error', duration = 5000) {
         authError,
         search,
         activeSection,
+        navigationOpen,
+        sectionGroup,
+        sectionDescription,
         locale,
         languageOptions,
         t,
@@ -4886,6 +4936,7 @@ function showToast(message, type = 'error', duration = 5000) {
         setDayCode,
         emailPasswordSignIn,
         signOut,
+        navigateToSection,
         goToTraineesPage,
         selectUser,
         openTrainee,

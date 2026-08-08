@@ -17,6 +17,26 @@ export const translations = {
       themeLight: 'Light mode',
       themeDark: 'Dark mode',
     },
+    navigation: {
+      portal: 'Coaching workspace',
+      mainMenu: 'Main navigation',
+      openMenu: 'Open navigation',
+      closeMenu: 'Close navigation',
+      groups: {
+        workspace: 'Workspace',
+        people: 'People',
+        library: 'Training library',
+      },
+      descriptions: {
+        dashboard: 'Your coaching activity, progress, and items that need attention.',
+        feedback: 'Read trainee messages and keep every conversation moving.',
+        trainees: 'Find trainees and open their complete coaching profile.',
+        trainers: 'Manage trainer accounts and their trainee assignments.',
+        payments: 'Review monthly payment status, amounts, and trends.',
+        exercises: 'Maintain the exercise catalogue used across workout plans.',
+        terminology: 'Manage the shared coaching terms shown throughout the portal.',
+      },
+    },
     sections: {
       dashboard: 'Overview',
       feedback: 'Feedback',
@@ -492,6 +512,26 @@ export const translations = {
       searchPlaceholder: 'Cerca allievi...',
       themeLight: 'Tema chiaro',
       themeDark: 'Tema scuro',
+    },
+    navigation: {
+      portal: 'Area coaching',
+      mainMenu: 'Navigazione principale',
+      openMenu: 'Apri navigazione',
+      closeMenu: 'Chiudi navigazione',
+      groups: {
+        workspace: 'Area di lavoro',
+        people: 'Persone',
+        library: 'Libreria allenamento',
+      },
+      descriptions: {
+        dashboard: 'Attività di coaching, progressi e aspetti che richiedono attenzione.',
+        feedback: 'Leggi i messaggi degli allievi e gestisci tutte le conversazioni.',
+        trainees: 'Trova gli allievi e apri il loro profilo completo.',
+        trainers: 'Gestisci gli account trainer e le assegnazioni agli allievi.',
+        payments: 'Controlla pagamenti mensili, importi e andamento.',
+        exercises: 'Gestisci il catalogo esercizi utilizzato nei piani di allenamento.',
+        terminology: 'Gestisci i termini di coaching condivisi nel portale.',
+      },
     },
     sections: {
       dashboard: 'Panoramica',

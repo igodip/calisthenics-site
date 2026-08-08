@@ -38,12 +38,51 @@
     </div>
 
     <div v-else class="app-shell trainee-shell">
+        <div v-if="navigationOpen" class="navigation-scrim" @click="navigationOpen=false" aria-hidden="true"></div>
+        <aside class="sidebar" :class="{open: navigationOpen}">
+            <div class="sidebar-header">
+                <span class="brand-mark">C</span>
+                <div class="sidebar-brand-copy">
+                    <div class="brand-title">Calisync</div>
+                    <div class="muted small">{{ t('navigation.portal') }}</div>
+                </div>
+                <button class="icon-button navigation-close" type="button" @click="navigationOpen=false" :aria-label="t('navigation.closeMenu')">×</button>
+            </div>
+            <nav class="nav" :aria-label="t('navigation.mainMenu')">
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.workspace') }}</div>
+                    <a href="./index.html#dashboard"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">⌂</span><span>{{ t('sections.dashboard') }}</span></span></a>
+                    <a href="./index.html#feedback"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◇</span><span>{{ t('sections.feedback') }}</span></span></a>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.people') }}</div>
+                    <a class="active" href="./index.html#trainees" aria-current="page"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◎</span><span>{{ t('sections.trainees') }}</span></span></a>
+                    <a v-if="canAssignTrainers" href="./index.html#trainers"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">△</span><span>{{ t('sections.trainers') }}</span></span></a>
+                    <a href="./index.html#payments"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">€</span><span>{{ t('sections.payments') }}</span></span></a>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.library') }}</div>
+                    <a href="./index.html#exercises"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">+</span><span>{{ t('sections.exercises') }}</span></span></a>
+                    <a href="./index.html#terminology"><span class="nav-item-main"><span class="nav-icon" aria-hidden="true">≡</span><span>{{ t('sections.terminology') }}</span></span></a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-chip">
+                    <div class="avatar">{{ (user?.email || '?').slice(0, 1).toUpperCase() }}</div>
+                    <div><div class="user-email">{{ user?.email }}</div><div class="muted small">{{ roleLabel }}</div></div>
+                </div>
+                <button class="btn ghost" @click="signOut">{{ t('actions.signOut') }}</button>
+            </div>
+        </aside>
         <main class="main trainee-main">
             <div class="topbar trainee-topbar">
-                <div>
-                    <div class="eyebrow">{{ t('sections.trainees') }}</div>
-                    <h2 class="page-title">{{ current ? (current.displayName || shortId(current.id)) : t('sections.trainees') }}</h2>
-                    <div class="muted small">{{ t('trainees.detailSubtitle') }}</div>
+                <div class="page-heading">
+                    <button class="icon-button navigation-toggle" type="button" @click="navigationOpen=true" :aria-label="t('navigation.openMenu')">☰</button>
+                    <div>
+                        <div class="eyebrow">{{ t('sections.trainees') }} / {{ t(`traineeTabs.${currentTraineeTab}`) }}</div>
+                        <h1 class="page-title">{{ current ? (current.displayName || shortId(current.id)) : t('sections.trainees') }}</h1>
+                        <div class="page-description">{{ t('trainees.detailSubtitle') }}</div>
+                    </div>
                 </div>
                 <div class="toolbar-secondary trainee-toolbar">
                     <button class="btn ghost" type="button" @click="goToTraineesPage">{{ t('actions.backToTrainees') }}</button>

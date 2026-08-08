@@ -39,47 +39,52 @@
     </div>
 
     <div v-else class="app-shell">
-        <aside class="sidebar">
+        <div v-if="navigationOpen" class="navigation-scrim" @click="navigationOpen=false" aria-hidden="true"></div>
+        <aside class="sidebar" :class="{open: navigationOpen}">
             <div class="sidebar-header">
                 <span class="brand-mark">C</span>
-                <div>
+                <div class="sidebar-brand-copy">
                     <div class="brand-title">Calisync</div>
-                    <div class="muted small">{{ t('app.title') }}</div>
+                    <div class="muted small">{{ t('navigation.portal') }}</div>
                 </div>
+                <button class="icon-button navigation-close" type="button" @click="navigationOpen=false" :aria-label="t('navigation.closeMenu')">×</button>
             </div>
-            <nav class="nav">
-                <button :class="{active: activeSection==='dashboard'}" @click="activeSection='dashboard'">
-                    <span>{{ t('sections.dashboard') }}</span>
-                    <span class="nav-badge">{{ dashboardNotes.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='feedback'}" @click="activeSection='feedback'">
-                    <span>{{ t('sections.feedback') }}</span>
-                    <span class="nav-badge">{{ feedbackEntries.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='trainees'}" @click="activeSection='trainees'">
-                    <span>{{ t('sections.trainees') }}</span>
-                    <span class="nav-badge">{{ filteredUsers.length }}</span>
-                </button>
-                <button
-                    v-if="canAssignTrainers"
-                    :class="{active: activeSection==='trainers'}"
-                    @click="activeSection='trainers'"
-                >
-                    <span>{{ t('sections.trainers') }}</span>
-                    <span class="nav-badge">{{ trainers.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='payments'}" @click="activeSection='payments'">
-                    <span>{{ t('sections.payments') }}</span>
-                    <span class="nav-badge">{{ paymentUsers.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='exercises'}" @click="activeSection='exercises'">
-                    <span>{{ t('sections.exercises') }}</span>
-                    <span class="nav-badge">{{ exercises.length }}</span>
-                </button>
-                <button :class="{active: activeSection==='terminology'}" @click="activeSection='terminology'">
-                    <span>{{ t('sections.terminology') }}</span>
-                    <span class="nav-badge">{{ terminology.length }}</span>
-                </button>
+            <nav class="nav" :aria-label="t('navigation.mainMenu')">
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.workspace') }}</div>
+                    <button :class="{active: activeSection==='dashboard'}" @click="navigateToSection('dashboard')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">⌂</span><span>{{ t('sections.dashboard') }}</span></span>
+                    </button>
+                    <button :class="{active: activeSection==='feedback'}" @click="navigateToSection('feedback')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◇</span><span>{{ t('sections.feedback') }}</span></span>
+                        <span class="nav-badge">{{ feedbackEntries.length }}</span>
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.people') }}</div>
+                    <button :class="{active: activeSection==='trainees'}" @click="navigateToSection('trainees')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◎</span><span>{{ t('sections.trainees') }}</span></span>
+                        <span class="nav-badge">{{ filteredUsers.length }}</span>
+                    </button>
+                    <button v-if="canAssignTrainers" :class="{active: activeSection==='trainers'}" @click="navigateToSection('trainers')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">△</span><span>{{ t('sections.trainers') }}</span></span>
+                        <span class="nav-badge">{{ trainers.length }}</span>
+                    </button>
+                    <button :class="{active: activeSection==='payments'}" @click="navigateToSection('payments')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">€</span><span>{{ t('sections.payments') }}</span></span>
+                    </button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-label">{{ t('navigation.groups.library') }}</div>
+                    <button :class="{active: activeSection==='exercises'}" @click="navigateToSection('exercises')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">+</span><span>{{ t('sections.exercises') }}</span></span>
+                        <span class="nav-badge">{{ exercises.length }}</span>
+                    </button>
+                    <button :class="{active: activeSection==='terminology'}" @click="navigateToSection('terminology')">
+                        <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">≡</span><span>{{ t('sections.terminology') }}</span></span>
+                        <span class="nav-badge">{{ terminology.length }}</span>
+                    </button>
+                </div>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-chip">
@@ -95,9 +100,13 @@
 
         <main class="main">
             <div class="topbar">
-                <div>
-                    <div class="eyebrow">{{ t(`sections.${activeSection}`) }}</div>
-                    <h2 class="page-title">{{ t('app.title') }}</h2>
+                <div class="page-heading">
+                    <button class="icon-button navigation-toggle" type="button" @click="navigationOpen=true" :aria-label="t('navigation.openMenu')">☰</button>
+                    <div>
+                        <div class="eyebrow">{{ t(`navigation.groups.${sectionGroup}`) }}</div>
+                        <h1 class="page-title">{{ t(`sections.${activeSection}`) }}</h1>
+                        <div class="page-description">{{ sectionDescription }}</div>
+                    </div>
                 </div>
                 <div class="toolbar-secondary">
                     <label class="search-field">
@@ -122,27 +131,27 @@
 
             <div class="section-panel dashboard-panel" :class="{active: activeSection==='dashboard'}">
                 <div class="hero-grid">
-                    <div class="hero-card">
+                    <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('trainees')">
                         <div>
                             <div class="muted small">{{ t('dashboard.generalTitle') }}</div>
                             <h3>{{ t('labels.shownCount', { count: dashboardTrainees.length }) }}</h3>
                         </div>
                         <span class="hero-pill">{{ t('sections.trainees') }}</span>
-                    </div>
-                    <div class="hero-card">
+                    </button>
+                    <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('payments')">
                         <div>
                             <div class="muted small">{{ t('payments.overviewTitle') }}</div>
                             <h3>{{ paymentSummary.total }}</h3>
                         </div>
                         <span class="hero-pill">{{ t('sections.payments') }}</span>
-                    </div>
-                    <div class="hero-card">
+                    </button>
+                    <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('feedback')">
                         <div>
                             <div class="muted small">{{ t('dashboard.feedbackTitle') }}</div>
                             <h3>{{ dashboardNotes.length }}</h3>
                         </div>
                         <span class="hero-pill">{{ t('dashboard.feedbackTitle') }}</span>
-                    </div>
+                    </button>
                 </div>
                 <div class="dashboard-grid">
                     <div class="card">
