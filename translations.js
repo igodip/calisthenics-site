@@ -79,6 +79,8 @@ export const translations = {
       none: 'None',
       collapse: 'Collapse',
       expand: 'Expand',
+      showAll: 'Show all ({count})',
+      showLess: 'Show less',
       closeFeedback: 'Close feedback',
       markRead: 'Mark read',
       markUnread: 'Mark unread',
@@ -86,6 +88,7 @@ export const translations = {
     labels: {
       totalCount: '{count} total',
       shownCount: '{count} shown',
+      shownOfTotal: 'Showing {shown} of {total}',
       dayCount: '{count} day',
       daysCount: '{count} days',
       exerciseCount: '{count} exercise',
@@ -135,6 +138,7 @@ export const translations = {
       amount: 'Amount',
       unknownExercise: 'Unknown exercise',
       traineeNotes: 'Trainee notes',
+      completedReps: '{count} reps',
     },
     dashboard: {
       feedbackTitle: 'Feedback & trainee notes',
@@ -575,6 +579,8 @@ export const translations = {
       none: 'Nessuno',
       collapse: 'Comprimi',
       expand: 'Espandi',
+      showAll: 'Mostra tutti ({count})',
+      showLess: 'Mostra meno',
       closeFeedback: 'Chiudi feedback',
       markRead: 'Segna letto',
       markUnread: 'Segna non letto',
@@ -582,6 +588,7 @@ export const translations = {
     labels: {
       totalCount: '{count} totali',
       shownCount: '{count} mostrati',
+      shownOfTotal: '{shown} di {total} mostrati',
       dayCount: '{count} giorno',
       daysCount: '{count} giorni',
       exerciseCount: '{count} esercizio',
@@ -631,6 +638,7 @@ export const translations = {
       amount: 'Importo',
       unknownExercise: 'Esercizio sconosciuto',
       traineeNotes: 'Note dell’allievo',
+      completedReps: '{count} ripetizioni',
     },
     dashboard: {
       feedbackTitle: 'Feedback & note allievi',

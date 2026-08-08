@@ -269,7 +269,7 @@
                             <div v-else-if="feedbackError" class="muted small">{{ feedbackError }}</div>
                             <div v-else-if="currentFeedbackEntries.length===0" class="muted small">{{ t('program.feedbackEmpty') }}</div>
                             <div v-else class="chat-list">
-                                <div v-for="note in currentFeedbackEntries" :key="note.id" class="chat-item">
+                                <div v-for="note in visibleCurrentFeedbackEntries" :key="note.id" class="chat-item">
                                     <div class="chat-meta">
                                         <strong>{{ note.statusLabel }}</strong>
                                         <span class="muted small">{{ note.createdLabel }}</span>
@@ -277,6 +277,12 @@
                                     <div class="chat-message">{{ note.message }}</div>
                                     <div v-if="note.answerMessage" class="muted small">{{ t('feedback.answerLabel') }}: {{ note.answerMessage }}</div>
                                 </div>
+                            </div>
+                            <div v-if="currentFeedbackEntries.length > 3" class="compact-list-footer">
+                                <span class="muted small">{{ t('labels.shownOfTotal', { shown: visibleCurrentFeedbackEntries.length, total: currentFeedbackEntries.length }) }}</span>
+                                <button class="small ghost" type="button" @click="toggleTraineeList('feedback')">
+                                    {{ traineeListExpanded.feedback ? t('actions.showLess') : t('actions.showAll', { count: currentFeedbackEntries.length }) }}
+                                </button>
                             </div>
                         </div>
 
@@ -319,6 +325,41 @@
                             </div>
                         </div>
 
+                        <div class="card trainee-completed-card">
+                            <div class="overview-card-header">
+                                <div class="stack">
+                                    <h3 style="margin:0">{{ t('program.completedLogTitle') }}</h3>
+                                    <span class="muted small">{{ t('program.completedLogSubtitle') }}</span>
+                                </div>
+                                <button class="small" type="button" @click="loadCompletedExercises" :disabled="loadingCompletedExercises">
+                                    {{ t('actions.refresh') }}
+                                </button>
+                            </div>
+                            <div v-if="loadingCompletedExercises" class="muted small">{{ t('status.loadingCompletedExercises') }}</div>
+                            <div v-else-if="completedExercisesError" class="muted small">{{ completedExercisesError }}</div>
+                            <div v-else-if="completedExerciseLog.length===0" class="muted small">{{ t('program.completedLogEmpty') }}</div>
+                            <div v-else class="exercise-log-list">
+                                <div v-for="entry in visibleCompletedExerciseLog" :key="entry.id" class="exercise-log-item">
+                                    <div class="exercise-log-main">
+                                        <strong>{{ entry.exercise }}</strong>
+                                        <span class="muted small">{{ entry.dayLabel }}</span>
+                                        <span v-if="entry.completedAtLabel" class="muted small">{{ entry.completedAtLabel }}</span>
+                                    </div>
+                                    <div class="exercise-log-result">
+                                        <span class="pill completed-reps-pill">{{ t('labels.completedReps', { count: entry.completedReps }) }}</span>
+                                        <span v-if="entry.traineeNotes" class="muted small">{{ t('labels.traineeNotes') }}: {{ entry.traineeNotes }}</span>
+                                        <span v-else-if="entry.notes" class="muted small">{{ t('labels.notes') }}: {{ entry.notes }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="completedExerciseLog.length > 5" class="compact-list-footer">
+                                <span class="muted small">{{ t('labels.shownOfTotal', { shown: visibleCompletedExerciseLog.length, total: completedExerciseLog.length }) }}</span>
+                                <button class="small ghost" type="button" @click="toggleTraineeList('completedExercises')">
+                                    {{ traineeListExpanded.completedExercises ? t('actions.showLess') : t('actions.showAll', { count: completedExerciseLog.length }) }}
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="card trainee-payment-card">
                             <div class="overview-card-header">
                                 <div class="stack">
@@ -331,7 +372,7 @@
                             <div v-else-if="paymentsError" class="muted small">{{ paymentsError }}</div>
                             <div v-else-if="paymentHistory.length===0" class="muted small">{{ t('program.paymentsEmpty') }}</div>
                             <div v-else class="list compact-list">
-                                <div v-for="payment in paymentHistory" :key="payment.id" class="payment-history-item">
+                                <div v-for="payment in visiblePaymentHistory" :key="payment.id" class="payment-history-item">
                                     <div class="stack">
                                         <strong>{{ formatDate(payment.month_start) }}</strong>
                                         <span class="muted small" v-if="payment.paid_at">{{ t('program.paidAt', { date: formatDate(payment.paid_at) }) }}</span>
@@ -343,6 +384,12 @@
                                         {{ payment.paid ? t('payment.onTime') : t('payment.overdue') }}
                                     </span>
                                 </div>
+                            </div>
+                            <div v-if="paymentHistory.length > 3" class="compact-list-footer">
+                                <span class="muted small">{{ t('labels.shownOfTotal', { shown: visiblePaymentHistory.length, total: paymentHistory.length }) }}</span>
+                                <button class="small ghost" type="button" @click="toggleTraineeList('payments')">
+                                    {{ traineeListExpanded.payments ? t('actions.showLess') : t('actions.showAll', { count: paymentHistory.length }) }}
+                                </button>
                             </div>
                         </div>
 
@@ -386,7 +433,7 @@
                             <div v-else-if="!weightHistory" class="muted small">{{ t('weightHistory.empty') }}</div>
                             <div v-else class="history-card">
                                 <div class="list compact-row-list">
-                                    <div v-for="log in weightLogs" :key="log.id" class="compact-row-item">
+                                    <div v-for="log in visibleWeightLogs" :key="log.id" class="compact-row-item">
                                         <div>
                                             <strong>{{ formatWeight(log.weight) }}</strong>
                                             <span class="muted small" v-if="log.recorded_at">{{ log.recorded_at }}</span>
@@ -394,6 +441,12 @@
                                         </div>
                                         <button class="icon-button small" type="button" @click="deleteWeightLog(log)" :aria-label="t('actions.delete')" :title="t('actions.delete')">×</button>
                                     </div>
+                                </div>
+                                <div v-if="weightLogs.length > 3" class="compact-list-footer">
+                                    <span class="muted small">{{ t('labels.shownOfTotal', { shown: visibleWeightLogs.length, total: weightLogs.length }) }}</span>
+                                    <button class="small ghost" type="button" @click="toggleTraineeList('weights')">
+                                        {{ traineeListExpanded.weights ? t('actions.showLess') : t('actions.showAll', { count: weightLogs.length }) }}
+                                    </button>
                                 </div>
                                 <div class="history-card-head">
                                     <div class="stack">
@@ -683,7 +736,7 @@
                         <div v-else-if="maxTestHistory.length===0" class="muted small">{{ t('history.none') }}</div>
                         <div v-else>
                             <div class="list compact-row-list">
-                                <div v-for="test in maxTests" :key="test.id" class="compact-row-item">
+                                <div v-for="test in visibleMaxTests" :key="test.id" class="compact-row-item">
                                     <div>
                                         <strong>{{ test.exercise }}</strong>
                                         <span class="muted small">{{ formatTestValue(test.value) }} {{ test.unit }}</span>
@@ -692,8 +745,14 @@
                                     <button class="icon-button small" type="button" @click="deleteMaxTest(test)" :aria-label="t('actions.delete')" :title="t('actions.delete')">×</button>
                                 </div>
                             </div>
+                            <div v-if="maxTests.length > 4" class="compact-list-footer">
+                                <span class="muted small">{{ t('labels.shownOfTotal', { shown: visibleMaxTests.length, total: maxTests.length }) }}</span>
+                                <button class="small ghost" type="button" @click="toggleTraineeList('tests')">
+                                    {{ traineeListExpanded.tests ? t('actions.showLess') : t('actions.showAll', { count: maxTests.length }) }}
+                                </button>
+                            </div>
                             <div class="history-grid max-test-grid">
-                            <div v-for="item in maxTestHistory" :key="item.exercise" class="card history-card max-test-history-card">
+                            <div v-for="item in visibleMaxTestHistory" :key="item.exercise" class="card history-card max-test-history-card">
                                 <div class="history-card-head">
                                     <div class="stack">
                                         <strong>{{ item.exercise }}</strong>
@@ -731,6 +790,12 @@
                                 </div>
                             </div>
                         </div>
+                            <div v-if="maxTestHistory.length > 2" class="compact-list-footer">
+                                <span class="muted small">{{ t('labels.shownOfTotal', { shown: visibleMaxTestHistory.length, total: maxTestHistory.length }) }}</span>
+                                <button class="small ghost" type="button" @click="toggleTraineeList('testCharts')">
+                                    {{ traineeListExpanded.testCharts ? t('actions.showLess') : t('actions.showAll', { count: maxTestHistory.length }) }}
+                                </button>
+                            </div>
                             </div>
                         </div>
                     </div>

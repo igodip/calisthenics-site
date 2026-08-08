@@ -162,6 +162,7 @@ function showToast(message, type = 'error', duration = 5000) {
       const current = ref(null);
       const currentTraineeTab = ref('overview');
       const currentCalendarExpanded = ref(false);
+      const traineeListExpanded = ref({});
       const days = ref([]);
       const plans = ref([]);
       const exerciseSelection = ref({});
@@ -911,6 +912,8 @@ function showToast(message, type = 'error', duration = 5000) {
               exercise: resolveExerciseName(entry) || t('labels.unknownExercise'),
               dayLabel,
               timeLabel: completedAt ? formatTime(completedAt) : '',
+              completedAtLabel: completedAt ? formatDateTime(completedAt) : '',
+              completedReps: Number(entry.completed_reps || 0),
               notes,
               traineeNotes,
               sortValue:
@@ -920,6 +923,12 @@ function showToast(message, type = 'error', duration = 5000) {
           })
           .sort((a, b) => b.sortValue - a.sortValue);
       });
+
+      const visibleCompletedExerciseLog = computed(() =>
+        traineeListExpanded.value.completedExercises
+          ? completedExerciseLog.value
+          : completedExerciseLog.value.slice(0, 5),
+      );
 
       const filteredUsers = computed(() => {
         const q = search.value.trim().toLowerCase();
@@ -943,9 +952,47 @@ function showToast(message, type = 'error', duration = 5000) {
       const currentFeedbackEntries = computed(() => {
         if (!current.value?.id) return [];
         return (feedbackEntries.value || [])
-          .filter((entry) => entry.traineeId === current.value.id)
-          .slice(0, 6);
+          .filter((entry) => entry.traineeId === current.value.id);
       });
+
+      const visibleCurrentFeedbackEntries = computed(() =>
+        traineeListExpanded.value.feedback
+          ? currentFeedbackEntries.value
+          : currentFeedbackEntries.value.slice(0, 3),
+      );
+      const visiblePaymentHistory = computed(() =>
+        traineeListExpanded.value.payments
+          ? paymentHistory.value
+          : paymentHistory.value.slice(0, 3),
+      );
+      const sortedWeightLogs = computed(() =>
+        (weightLogs.value || []).slice().reverse(),
+      );
+      const visibleWeightLogs = computed(() =>
+        traineeListExpanded.value.weights
+          ? sortedWeightLogs.value
+          : sortedWeightLogs.value.slice(0, 3),
+      );
+      const sortedMaxTests = computed(() =>
+        (maxTests.value || []).slice().reverse(),
+      );
+      const visibleMaxTests = computed(() =>
+        traineeListExpanded.value.tests
+          ? sortedMaxTests.value
+          : sortedMaxTests.value.slice(0, 4),
+      );
+      const visibleMaxTestHistory = computed(() =>
+        traineeListExpanded.value.testCharts
+          ? maxTestHistory.value
+          : maxTestHistory.value.slice(0, 2),
+      );
+
+      function toggleTraineeList(list) {
+        traineeListExpanded.value = {
+          ...traineeListExpanded.value,
+          [list]: !traineeListExpanded.value[list],
+        };
+      }
 
       const lastWeekTrainees = computed(() => {
         const statusMap = traineeWeekStatus.value || {};
@@ -3279,6 +3326,7 @@ function showToast(message, type = 'error', duration = 5000) {
         current.value = u;
         currentTraineeTab.value = 'overview';
         currentCalendarExpanded.value = false;
+        traineeListExpanded.value = {};
         days.value = [];
         plans.value = [];
         planEdits.value = {};
@@ -3300,6 +3348,8 @@ function showToast(message, type = 'error', duration = 5000) {
         };
         paymentHistory.value = [];
         paymentsError.value = '';
+        completedExercises.value = [];
+        completedExercisesError.value = '';
         coachTipDraft.value = u?.coach_tip || '';
         trainerNotesDraft.value = u?.trainer_notes || '';
         await loadExercises(u);
@@ -3319,6 +3369,7 @@ function showToast(message, type = 'error', duration = 5000) {
           loadDays(u),
           loadPlans(u),
           loadPaymentHistory(u),
+          loadCompletedExercises(u),
           loadFeedbackEntries(),
         ]);
       }
@@ -3733,7 +3784,7 @@ function showToast(message, type = 'error', duration = 5000) {
           const { data, error } = await supabase
             .from('day_exercises')
             .select(
-              'id, exercise, exercise_id, notes, trainee_notes, completed, duration_minutes, days!inner ( id, week, day_code, title, completed_at, workout_plan_days!inner ( workout_plans!inner ( trainee_id ) ) )',
+              'id, exercise, exercise_id, notes, trainee_notes, completed, completed_reps, duration_minutes, days!inner ( id, week, day_code, title, completed_at, workout_plan_days!inner ( workout_plans!inner ( trainee_id ) ) )',
             )
             .eq('completed', true)
             .eq('days.workout_plan_days.workout_plans.trainee_id', u.id);
@@ -4774,6 +4825,12 @@ function showToast(message, type = 'error', duration = 5000) {
         filteredTrainers,
         dashboardTrainees,
         currentFeedbackEntries,
+        visibleCurrentFeedbackEntries,
+        visiblePaymentHistory,
+        visibleWeightLogs,
+        visibleMaxTests,
+        visibleMaxTestHistory,
+        traineeListExpanded,
         showLastWeekCard,
         lastWeekTrainees,
         overdueUsers,
@@ -4825,6 +4882,7 @@ function showToast(message, type = 'error', duration = 5000) {
         weightLogForm,
         maxTestForm,
         completedExerciseLog,
+        visibleCompletedExerciseLog,
         exerciseSelection,
         dayEdits,
         dayExerciseEdits,
@@ -4937,6 +4995,7 @@ function showToast(message, type = 'error', duration = 5000) {
         emailPasswordSignIn,
         signOut,
         navigateToSection,
+        toggleTraineeList,
         goToTraineesPage,
         selectUser,
         openTrainee,

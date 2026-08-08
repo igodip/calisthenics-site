@@ -1658,6 +1658,7 @@ button.ghost{
 
 .trainee-feedback-card,
 .trainee-calendar-card,
+.trainee-completed-card,
 .trainee-payment-card,
 .trainee-weight-card,
 .max-test-card,
@@ -1665,6 +1666,45 @@ button.ghost{
   display:flex;
   flex-direction:column;
   gap:14px;
+}
+
+.trainee-completed-card{
+  grid-column:1 / -1;
+}
+
+.exercise-log-list{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+}
+
+.exercise-log-item{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  min-width:0;
+}
+
+.exercise-log-main,
+.exercise-log-result{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  min-width:0;
+}
+
+.exercise-log-result{
+  align-items:flex-end;
+  text-align:right;
+}
+
+.completed-reps-pill{
+  color:var(--accent-strong);
+  background:var(--accent-soft);
+  border-color:color-mix(in srgb, var(--accent) 35%, var(--line));
+  font-weight:750;
+  white-space:nowrap;
 }
 
 .trainee-weight-card{
@@ -1725,6 +1765,34 @@ button.ghost{
 
 .compact-row-item strong{
   margin-right:6px;
+}
+
+.compact-list-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:36px;
+  padding:7px 2px 0;
+  border-top:1px solid var(--line);
+}
+
+.compact-list-footer button.ghost{
+  min-height:34px;
+  padding:6px 10px;
+  white-space:nowrap;
+}
+
+.trainee-feedback-card .chat-list{
+  gap:8px;
+}
+
+.trainee-feedback-card .chat-item{
+  padding:10px 12px;
+}
+
+.trainee-payment-card .compact-list{
+  max-height:none;
 }
 
 .trainee-calendar-card .compact-calendar-grid{
@@ -2557,5 +2625,18 @@ button.ghost{
 
   .trainee-toolbar > .btn:last-child{
     display:none;
+  }
+
+  .exercise-log-list{
+    grid-template-columns:1fr;
+  }
+
+  .exercise-log-item{
+    align-items:stretch;
+  }
+
+  .exercise-log-result{
+    align-items:flex-start;
+    text-align:left;
   }
 }
