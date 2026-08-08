@@ -1,0 +1,104 @@
+<div
+    v-if="canAssignTrainers"
+    class="row section-panel"
+    :class="{active: activeSection==='trainers'}"
+>
+    <div class="col">
+        <div class="card">
+            <div class="overview-card-header">
+                <div class="stack">
+                    <h2 style="margin:0">{{ t('trainers.managementTitle') }}</h2>
+                    <span class="muted small">{{ t('trainers.managementSubtitle') }}</span>
+                </div>
+                <span class="pill">{{ t('labels.shownCount', { count: filteredTrainers.length }) }}</span>
+            </div>
+            <div class="muted small" style="margin-top:12px">
+                {{ t('trainers.managementHelp') }}
+            </div>
+            <div class="exercise-form-grid" style="margin-top:12px">
+                <label class="stack small">
+                    <span class="muted small">{{ t('trainers.idLabel') }}</span>
+                    <input
+                        v-model="trainerForm.id"
+                        class="mono"
+                        :placeholder="t('trainers.idPlaceholder')"
+                    />
+                </label>
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.name') }}</span>
+                    <input
+                        v-model="trainerForm.name"
+                        :placeholder="t('trainers.namePlaceholder')"
+                    />
+                </label>
+            </div>
+            <div class="exercise-form-actions">
+                <button class="small" type="button" @click="createTrainer" :disabled="creatingTrainer">
+                    {{ t('trainers.createAction') }}
+                </button>
+                <button class="small ghost" type="button" @click="resetTrainerForm" :disabled="creatingTrainer">
+                    {{ t('actions.clear') }}
+                </button>
+                <span v-if="creatingTrainer" class="muted small">{{ t('trainers.createSaving') }}</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="dashboard-card-header">
+                <div class="stack">
+                    <h2 style="margin:0">{{ t('trainers.directoryTitle') }}</h2>
+                    <span class="muted small">{{ t('trainers.directorySubtitle') }}</span>
+                </div>
+                <button class="small" type="button" @click="loadTrainers" :disabled="loadingTrainers">
+                    {{ t('actions.refresh') }}
+                </button>
+            </div>
+            <div v-if="loadingTrainers" class="muted small">{{ t('status.loadingTrainers') }}</div>
+            <div v-else-if="trainerDirectoryError" class="muted small">{{ trainerDirectoryError }}</div>
+            <div v-else-if="filteredTrainers.length===0" class="muted small">{{ t('trainers.empty') }}</div>
+            <div v-else class="list scroll-area">
+                <div v-for="trainer in filteredTrainers" :key="trainer.id" class="card" style="padding:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                        <div>
+                            <strong>{{ trainer.displayName || shortId(trainer.id) }}</strong>
+                            <div class="muted small mono">{{ trainer.id }}</div>
+                        </div>
+                        <span class="pill">{{ t('trainers.assignedCount', { count: trainer.assignedCount || 0 }) }}</span>
+                    </div>
+                    <div class="muted small" v-if="trainer.created_at" style="margin-top:8px">
+                        {{ t('labels.createdAt') }} {{ formatDateTime(trainer.created_at) }}
+                    </div>
+                    <div class="exercise-form-grid" style="margin-top:12px">
+                        <label class="stack small">
+                            <span class="muted small">{{ t('labels.name') }}</span>
+                            <input
+                                v-model="trainerEdits[trainer.id].name"
+                                :placeholder="t('trainers.namePlaceholder')"
+                                :disabled="trainerSaving[trainer.id]"
+                            />
+                        </label>
+                    </div>
+                    <div class="exercise-form-actions">
+                        <button
+                            class="small"
+                            type="button"
+                            @click="saveTrainer(trainer)"
+                            :disabled="trainerSaving[trainer.id]"
+                        >
+                            {{ t('actions.save') }}
+                        </button>
+                        <button
+                            class="small ghost"
+                            type="button"
+                            @click="deleteTrainer(trainer)"
+                            :disabled="trainerSaving[trainer.id]"
+                        >
+                            {{ t('actions.delete') }}
+                        </button>
+                        <span v-if="trainerSaving[trainer.id]" class="muted small">{{ t('status.savingTrainer') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

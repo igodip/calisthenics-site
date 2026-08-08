@@ -1,0 +1,86 @@
+<div class="section-panel feedback-panel" :class="{active: activeSection==='feedback'}">
+    <div class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('feedback.title') }}</h2>
+                <span class="muted small">{{ t('feedback.subtitle') }}</span>
+            </div>
+            <button class="small" type="button" @click="loadFeedbackEntries" :disabled="feedbackLoading">
+                {{ t('actions.refresh') }}
+            </button>
+        </div>
+        <div class="filter-row">
+            <button
+                v-for="option in feedbackFilterOptions"
+                :key="option.value"
+                :class="{active: feedbackFilter===option.value}"
+                type="button"
+                @click="feedbackFilter=option.value"
+            >
+                {{ option.label }}
+            </button>
+        </div>
+        <div v-if="feedbackLoading" class="muted small">{{ t('feedback.loading') }}</div>
+        <div v-else-if="feedbackError" class="muted small">{{ feedbackError }}</div>
+        <div v-else-if="filteredFeedbackEntries.length===0" class="muted small">{{ t('feedback.empty') }}</div>
+        <div v-else class="chat-list">
+            <div v-for="note in filteredFeedbackEntries" :key="note.id" class="chat-item">
+                <div class="chat-meta">
+                    <strong>{{ note.traineeName }}</strong>
+                    <div class="chat-meta-actions">
+                        <span class="pill">{{ note.statusLabel }}</span>
+                        <button
+                            v-if="!note.readAt"
+                            class="small"
+                            type="button"
+                            @click="setFeedbackRead(note, true)"
+                            :disabled="feedbackUpdateSaving[note.id]"
+                        >
+                            {{ t('actions.markRead') }}
+                        </button>
+                        <button
+                            v-else
+                            class="small"
+                            type="button"
+                            @click="setFeedbackRead(note, false)"
+                            :disabled="feedbackUpdateSaving[note.id]"
+                        >
+                            {{ t('actions.markUnread') }}
+                        </button>
+                    </div>
+                </div>
+                <div class="muted small">
+                    <span v-if="note.createdLabel">{{ t('labels.createdAt') }} {{ note.createdLabel }}</span>
+                    <span v-if="note.readLabel"> • {{ t('labels.readAt') }} {{ note.readLabel }}</span>
+                </div>
+                <div class="chat-message">{{ note.message }}</div>
+                <div class="muted small" v-if="note.answeredLabel" style="margin-top:8px">
+                    {{ t('feedback.answeredAt') }} {{ note.answeredLabel }}
+                </div>
+                <div class="chat-message" v-if="note.answerMessage" style="margin-top:8px">
+                    <strong>{{ t('feedback.answerLabel') }}</strong>
+                    <div>{{ note.answerMessage }}</div>
+                </div>
+                <div v-if="!note.answeredAt" style="margin-top:10px;display:grid;gap:8px">
+                    <textarea
+                        class="input"
+                        rows="3"
+                        :placeholder="t('feedback.answerPlaceholder')"
+                        v-model="feedbackReplyDrafts[note.id]"
+                        :disabled="feedbackReplySaving[note.id]"
+                    ></textarea>
+                    <div style="display:flex;justify-content:flex-end">
+                        <button
+                            class="small"
+                            type="button"
+                            @click="saveFeedbackReply(note)"
+                            :disabled="feedbackReplySaving[note.id]"
+                        >
+                            {{ t('feedback.sendAnswer') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

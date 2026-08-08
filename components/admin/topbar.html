@@ -1,0 +1,29 @@
+<div class="topbar">
+    <div class="page-heading">
+        <button class="icon-button navigation-toggle" type="button" @click="navigationOpen=true" :aria-label="t('navigation.openMenu')">☰</button>
+        <div>
+            <div class="eyebrow">{{ t(`navigation.groups.${sectionGroup}`) }}</div>
+            <h1 class="page-title">{{ t(`sections.${activeSection}`) }}</h1>
+            <div class="page-description">{{ sectionDescription }}</div>
+        </div>
+    </div>
+    <div class="toolbar-secondary">
+        <label class="search-field">
+            <span class="muted small">{{ t('toolbar.searchPlaceholder') }}</span>
+            <input v-model="search" :placeholder="t('toolbar.searchPlaceholder')" />
+        </label>
+        <button
+            class="icon-button theme-toggle"
+            type="button"
+            @click="toggleTheme"
+            :aria-label="theme === 'dark' ? t('toolbar.themeLight') : t('toolbar.themeDark')"
+            :title="theme === 'dark' ? t('toolbar.themeLight') : t('toolbar.themeDark')"
+        >
+            <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
+        </button>
+        <select v-model="locale" class="pill" :aria-label="t('toolbar.language')">
+            <option v-for="option in languageOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+        <button class="btn soft" @click="signOut">{{ t('actions.signOut') }}</button>
+    </div>
+</div>

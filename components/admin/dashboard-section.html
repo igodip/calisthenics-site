@@ -1,0 +1,243 @@
+<div class="section-panel dashboard-panel" :class="{active: activeSection==='dashboard'}">
+    <div class="hero-grid">
+        <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('trainees')">
+            <div>
+                <div class="muted small">{{ t('dashboard.generalTitle') }}</div>
+                <h3>{{ t('labels.shownCount', { count: dashboardTrainees.length }) }}</h3>
+            </div>
+            <span class="hero-pill">{{ t('sections.trainees') }}</span>
+        </button>
+        <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('payments')">
+            <div>
+                <div class="muted small">{{ t('payments.overviewTitle') }}</div>
+                <h3>{{ paymentSummary.total }}</h3>
+            </div>
+            <span class="hero-pill">{{ t('sections.payments') }}</span>
+        </button>
+        <button class="hero-card dashboard-shortcut" type="button" @click="navigateToSection('feedback')">
+            <div>
+                <div class="muted small">{{ t('dashboard.feedbackTitle') }}</div>
+                <h3>{{ dashboardNotes.length }}</h3>
+            </div>
+            <span class="hero-pill">{{ t('dashboard.feedbackTitle') }}</span>
+        </button>
+    </div>
+    <div class="dashboard-grid">
+        <div class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('dashboard.feedbackTitle') }}</h2>
+                <span class="muted small">{{ t('dashboard.feedbackSubtitle') }}</span>
+            </div>
+            <button class="small" type="button" @click="loadDashboardNotes" :disabled="dashboardNotesLoading">{{ t('actions.refresh') }}</button>
+        </div>
+        <div v-if="dashboardNotesLoading" class="muted small">{{ t('dashboard.loadingFeedback') }}</div>
+        <div v-else-if="dashboardNotesError" class="muted small">{{ dashboardNotesError }}</div>
+        <div v-else-if="dashboardNotes.length===0" class="muted small">{{ t('dashboard.noFeedback') }}</div>
+        <div v-else class="chat-list">
+            <div v-for="note in dashboardNotes" :key="note.id" class="chat-item">
+                <div class="chat-meta">
+                    <strong>{{ note.traineeName }}</strong>
+                    <div class="chat-meta-actions">
+                        <span class="pill">{{ note.statusLabel }}</span>
+                        <button class="icon-button" type="button" @click="closeDashboardNote(note)" :disabled="dashboardNoteClosing[note.id]" :aria-label="t('actions.closeFeedback')" :title="t('actions.closeFeedback')">×</button>
+                    </div>
+                </div>
+                <div class="muted small" v-if="note.dateLabel">{{ note.dateLabel }}</div>
+                <div class="chat-message">{{ note.message }}</div>
+            </div>
+        </div>
+    </div>
+
+        <div class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('dashboard.generalTitle') }}</h2>
+                <span class="muted small">{{ t('dashboard.generalSubtitle') }}</span>
+            </div>
+            <span class="pill">{{ t('labels.shownCount', { count: dashboardTrainees.length }) }}</span>
+        </div>
+        <div v-if="dashboardTrainees.length===0" class="muted small" style="margin-top:10px">
+            {{ t('dashboard.generalEmpty') }}
+        </div>
+        <div v-else class="dashboard-trainee-list scroll-area">
+            <div class="dashboard-trainee-item" v-for="u in dashboardTrainees" :key="u.id">
+                <div class="stack">
+                    <strong>{{ u.displayName || shortId(u.id) }}</strong>
+                    <span class="muted small mono">{{ u.id }}</span>
+                </div>
+                <div class="stack dashboard-trainee-actions">
+                    <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
+                        {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
+                    </span>
+                    <button class="small" type="button" @click="openTrainee(u)">{{ t('actions.openTrainee') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div v-if="showLastWeekCard" class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('dashboard.lastWeekTitle') }}</h2>
+                <span class="muted small">{{ t('dashboard.lastWeekSubtitle') }}</span>
+            </div>
+            <span class="pill">{{ t('labels.shownCount', { count: lastWeekTrainees.length }) }}</span>
+        </div>
+        <div v-if="loadingWeekStatus" class="muted small" style="margin-top:10px">
+            {{ t('dashboard.lastWeekLoading') }}
+        </div>
+        <div v-else-if="weekStatusError" class="muted small" style="margin-top:10px">
+            {{ weekStatusError }}
+        </div>
+        <div v-else-if="lastWeekTrainees.length===0" class="muted small" style="margin-top:10px">
+            {{ t('dashboard.lastWeekEmpty') }}
+        </div>
+        <div v-else class="dashboard-trainee-list scroll-area">
+            <div class="dashboard-trainee-item" v-for="u in lastWeekTrainees" :key="u.id">
+                <div class="stack">
+                    <strong>{{ u.displayName || shortId(u.id) }}</strong>
+                    <span class="muted small">{{ weekStatusFor(u) }}</span>
+                </div>
+                <div class="stack dashboard-trainee-actions">
+                    <span class="pill warning">{{ t('labels.lastWeek') }}</span>
+                    <button class="small" type="button" @click="openTrainee(u)">{{ t('actions.openTrainee') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <div class="card dashboard-burndown-card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('dashboard.burndownTitle') }}</h2>
+                <span class="muted small">{{ t('dashboard.burndownSubtitle') }}</span>
+            </div>
+            <span class="pill" v-if="dashboardBurndown.minDateLabel && dashboardBurndown.maxDateLabel">
+                {{ dashboardBurndown.minDateLabel }} → {{ dashboardBurndown.maxDateLabel }}
+            </span>
+        </div>
+        <div v-if="dashboardBurndownLoading" class="muted small" style="margin-top:10px">
+            {{ t('dashboard.burndownLoading') }}
+        </div>
+        <div v-else-if="dashboardBurndownError" class="muted small" style="margin-top:10px">
+            {{ dashboardBurndownError }}
+        </div>
+        <div v-else-if="dashboardBurndown.lines.length===0" class="muted small" style="margin-top:10px">
+            {{ t('dashboard.burndownEmpty') }}
+        </div>
+        <div v-else class="burndown-chart-wrap">
+            <svg
+                class="burndown-chart"
+                role="img"
+                :aria-label="t('dashboard.burndownTitle')"
+                :viewBox="`0 0 ${dashboardBurndown.chartWidth} ${dashboardBurndown.chartHeight}`"
+            >
+                <defs>
+                    <linearGradient
+                        v-for="line in visibleBurndownLines"
+                        :key="`burndown-gradient-${line.traineeId}`"
+                        :id="`burndown-gradient-${line.traineeId}`"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                    >
+                        <stop offset="0%" :stop-color="line.color" stop-opacity="0.18" />
+                        <stop offset="100%" :stop-color="line.color" stop-opacity="0.01" />
+                    </linearGradient>
+                </defs>
+                <g class="chart-grid">
+                    <line
+                        v-for="(tick, index) in dashboardBurndown.axisTicks"
+                        :key="`burndown-grid-${index}`"
+                        class="chart-grid-line"
+                        x1="44"
+                        :x2="dashboardBurndown.chartWidth - 44"
+                        :y1="tick.y"
+                        :y2="tick.y"
+                    />
+                    <line
+                        v-for="(tick, index) in dashboardBurndown.xTicks"
+                        :key="`burndown-x-grid-${index}`"
+                        class="chart-grid-line vertical"
+                        :x1="tick.x"
+                        :x2="tick.x"
+                        y1="44"
+                        :y2="dashboardBurndown.baselineY"
+                    />
+                </g>
+                <g class="chart-axis">
+                    <text
+                        v-for="(tick, index) in dashboardBurndown.axisTicks"
+                        :key="`burndown-y-${index}`"
+                        class="chart-axis-label"
+                        x="8"
+                        :y="tick.y + 4"
+                    >
+                        {{ tick.label }}
+                    </text>
+                    <text
+                        v-for="(tick, index) in dashboardBurndown.xTicks"
+                        :key="`burndown-x-${index}`"
+                        class="chart-axis-label"
+                        :x="tick.x"
+                        :y="dashboardBurndown.chartHeight - 12"
+                        text-anchor="middle"
+                    >
+                        {{ tick.label }}
+                    </text>
+                </g>
+                <path
+                    v-for="line in visibleBurndownLines"
+                    :key="`burndown-area-${line.traineeId}`"
+                    class="chart-area"
+                    :d="line.areaPath"
+                    :fill="`url(#burndown-gradient-${line.traineeId})`"
+                />
+                <polyline
+                    v-for="line in visibleBurndownLines"
+                    :key="line.traineeId"
+                    :points="line.polyline"
+                    :stroke="line.color"
+                    class="chart-line"
+                    fill="none"
+                />
+                <circle
+                    v-for="line in visibleBurndownLines"
+                    :key="`burndown-last-${line.traineeId}`"
+                    class="chart-last-point"
+                    :style="{ '--chart-color': line.color }"
+                    :cx="line.lastPoint?.x"
+                    :cy="line.lastPoint?.y"
+                    r="4"
+                />
+            </svg>
+            <div class="burndown-axis-label burndown-axis-label-y">
+                {{ t('dashboard.burndownYAxis') }}
+            </div>
+            <div class="burndown-axis-label burndown-axis-label-x">
+                {{ t('dashboard.burndownXAxis') }}
+            </div>
+            <div class="burndown-legend">
+                <button
+                    class="burndown-legend-item"
+                    :class="{ active: isBurndownTraineeSelected(line.traineeId) }"
+                    v-for="line in dashboardBurndown.lines"
+                    :key="line.traineeId"
+                    type="button"
+                    @click="toggleBurndownTraineeSelection(line.traineeId)"
+                >
+                    <span class="burndown-legend-swatch" :style="{ backgroundColor: line.color }"></span>
+                    <div>
+                        <strong>{{ line.traineeName }}</strong>
+                        <div class="muted small">
+                            {{ t('dashboard.burndownRemaining', { remaining: line.latestRemaining, total: line.total }) }}
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    </div>
+</div>

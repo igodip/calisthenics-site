@@ -1,0 +1,255 @@
+<div class="section-panel payments-panel" :class="{active: activeSection==='payments'}">
+    <div class="dashboard-grid payments-grid">
+        <div class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('payments.overviewTitle') }}</h2>
+                <span class="muted small">{{ t('payments.overviewSubtitle') }}</span>
+            </div>
+            <span class="pill">{{ t('labels.shownCount', { count: paymentUsers.length }) }}</span>
+        </div>
+        <div class="filter-row">
+            <button
+                    v-for="filter in paymentFilterOptions"
+                    :key="filter.value"
+                    type="button"
+                    :class="{active: paymentFilter===filter.value}"
+                    @click="paymentFilter=filter.value"
+            >
+                {{ t(filter.labelKey) }}
+            </button>
+        </div>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.totalLabel') }}</span>
+                <strong>{{ paymentSummary.total }}</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.paidLabel') }}</span>
+                <strong>{{ paymentSummary.paid }}</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.overdueLabel') }}</span>
+                <strong>{{ paymentSummary.overdue }}</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.receivedAmountLabel') }}</span>
+                <strong>{{ formatAmount(paymentSummary.receivedAmount) }}</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.forecastedAmountLabel') }}</span>
+                <strong>{{ formatAmount(paymentSummary.forecastedAmount) }}</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">{{ t('payments.dueAmountLabel') }}</span>
+                <strong>{{ formatAmount(paymentSummary.dueAmount) }}</strong>
+            </div>
+        </div>
+    </div>
+
+        <div class="card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('payments.overdueTitle') }}</h2>
+                <span class="muted small">{{ t('payments.overdueSubtitle') }}</span>
+            </div>
+        </div>
+        <div v-if="overdueUsers.length===0" class="muted small">{{ t('payments.noOverdue') }}</div>
+        <div v-else class="list">
+            <div v-for="u in overdueUsers" :key="u.id" class="payment-alert">
+                <div class="stack">
+                    <strong>{{ u.displayName || shortId(u.id) }}</strong>
+                    <span class="muted small mono">{{ u.id }}</span>
+                </div>
+                <div class="inline-actions">
+                    <button class="small" type="button" :disabled="paymentSaving[u.id]" @click="markPaymentPaid(u)">
+                        {{ t('payments.markPaid') }}
+                    </button>
+                    <button class="small" type="button" @click="openTrainee(u)">{{ t('dashboard.openProgram') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <div class="card payments-manage-card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('payments.manageTitle') }}</h2>
+                <span class="muted small">{{ t('payments.manageSubtitle') }}</span>
+            </div>
+        </div>
+        <div v-if="paymentUsers.length===0" class="muted small">{{ t('payments.noMatches') }}</div>
+        <div v-else class="list scroll-area payments-list">
+            <div v-for="u in paymentUsers" :key="u.id" class="card payment-card">
+                <button
+                    class="payment-card-header payment-card-toggle"
+                    type="button"
+                    @click="togglePaymentCard(u.id)"
+                    :aria-expanded="isPaymentCardOpen(u.id) ? 'true' : 'false'"
+                >
+                    <div class="stack">
+                        <strong>{{ u.displayName || shortId(u.id) }}</strong>
+                        <span class="muted small mono">{{ u.id }}</span>
+                    </div>
+                    <div class="payment-card-summary">
+                        <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
+                            {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
+                        </span>
+                        <span class="payment-card-chevron" :class="{ open: isPaymentCardOpen(u.id) }">⌄</span>
+                    </div>
+                </button>
+                <div v-if="isPaymentCardOpen(u.id)" class="payment-card-body">
+                    <div class="payment-actions">
+                        <span class="pill" :class="u.paid ? 'paid' : 'overdue'">
+                            {{ u.paid ? t('payment.onTime') : t('payment.overdue') }}
+                        </span>
+                        <button class="small" type="button" @click="openTrainee(u)">{{ t('actions.openTrainee') }}</button>
+                    </div>
+                    <div class="payment-amount-row">
+                        <label class="stack small">
+                            <span class="muted small">{{ t('labels.amount') }}</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                v-model="paymentAmountEdits[u.id]"
+                                :placeholder="t('placeholders.amount')"
+                            />
+                        </label>
+                        <button
+                            class="small"
+                            type="button"
+                            :disabled="paymentAmountSaving[u.id]"
+                            @click="savePaymentAmount(u)"
+                        >
+                            {{ t('actions.save') }}
+                        </button>
+                    </div>
+                    <div class="muted small" v-if="paymentSaving[u.id]">{{ t('status.updatingPayment') }}</div>
+                    <div class="muted small" v-if="paymentAmountSaving[u.id]">{{ t('status.updatingPaymentAmount') }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <div class="card payment-trend-card">
+        <div class="dashboard-card-header">
+            <div class="stack">
+                <h2 style="margin:0">{{ t('payments.trendTitle') }}</h2>
+                <span class="muted small">{{ t('payments.trendSubtitle') }}</span>
+            </div>
+        </div>
+        <div v-if="paymentTrendsLoading" class="muted small">
+            {{ t('status.loadingPaymentTrends') }}
+        </div>
+        <div v-else-if="paymentTrendsError" class="muted small">{{ paymentTrendsError }}</div>
+        <div v-else-if="paymentTrends.series.length===0" class="muted small">
+            {{ t('payments.trendEmpty') }}
+        </div>
+        <div v-else class="payment-trend-body">
+            <svg
+                class="payment-trend-chart"
+                role="img"
+                :aria-label="t('payments.trendTitle')"
+                :viewBox="`0 0 ${paymentTrends.chartWidth} ${paymentTrends.chartHeight}`"
+            >
+                <defs>
+                    <linearGradient
+                        v-for="line in paymentTrends.series"
+                        :key="`payment-gradient-${line.key}`"
+                        :id="`payment-gradient-${line.key}`"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                    >
+                        <stop offset="0%" :stop-color="line.color" stop-opacity="0.18" />
+                        <stop offset="100%" :stop-color="line.color" stop-opacity="0.01" />
+                    </linearGradient>
+                </defs>
+                <g class="chart-grid">
+                    <line
+                        v-for="(tick, index) in paymentTrends.axisTicks"
+                        :key="`payment-grid-${index}`"
+                        class="chart-grid-line"
+                        x1="44"
+                        :x2="paymentTrends.chartWidth - 44"
+                        :y1="tick.y"
+                        :y2="tick.y"
+                    />
+                    <line
+                        v-for="(tick, index) in paymentTrends.xTicks"
+                        :key="`payment-x-grid-${index}`"
+                        class="chart-grid-line vertical"
+                        :x1="tick.x"
+                        :x2="tick.x"
+                        y1="44"
+                        :y2="paymentTrends.baselineY"
+                    />
+                </g>
+                <g class="payment-trend-axis-ticks">
+                    <text
+                        v-for="(tick, index) in paymentTrends.axisTicks"
+                        :key="index"
+                        class="chart-axis-label"
+                        x="6"
+                        :y="tick.y + 4"
+                    >
+                        {{ tick.label }}
+                    </text>
+                    <text
+                        v-for="(tick, index) in paymentTrends.xTicks"
+                        :key="`payment-x-${index}`"
+                        class="chart-axis-label"
+                        :x="tick.x"
+                        :y="paymentTrends.chartHeight - 12"
+                        text-anchor="middle"
+                    >
+                        {{ tick.label }}
+                    </text>
+                </g>
+                <line
+                    class="payment-trend-axis-line"
+                    x1="44"
+                    :x2="paymentTrends.chartWidth - 44"
+                    :y1="paymentTrends.baselineY"
+                    :y2="paymentTrends.baselineY"
+                ></line>
+                <path
+                    v-for="line in paymentTrends.series"
+                    :key="`payment-area-${line.key}`"
+                    class="chart-area"
+                    :d="line.areaPath"
+                    :fill="`url(#payment-gradient-${line.key})`"
+                ></path>
+                <polyline
+                    v-for="line in paymentTrends.series"
+                    :key="line.key"
+                    class="payment-trend-line chart-line"
+                    :stroke="line.color"
+                    :points="line.polyline"
+                ></polyline>
+                <circle
+                    v-for="line in paymentTrends.series"
+                    :key="`payment-last-${line.key}`"
+                    class="chart-last-point"
+                    :style="{ '--chart-color': line.color }"
+                    :cx="line.lastPoint?.x"
+                    :cy="line.lastPoint?.y"
+                    r="4"
+                ></circle>
+            </svg>
+            <div v-if="paymentTrends.months.length" class="payment-trend-axis">
+                <span>{{ formatMonthLabel(paymentTrends.months[0]) }}</span>
+                <span>{{ formatMonthLabel(paymentTrends.months[paymentTrends.months.length - 1]) }}</span>
+            </div>
+            <div class="payment-trend-legend">
+                <div v-for="line in paymentTrends.series" :key="line.key" class="legend-item">
+                    <span class="legend-swatch" :style="{ backgroundColor: line.color }"></span>
+                    <span>{{ t(line.labelKey) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>

@@ -1,0 +1,23 @@
+<div v-if="!session" class="auth-shell">
+    <div class="auth-card">
+        <div class="brand">
+            <span class="brand-mark">C</span>
+            <div>
+                <h1>{{ t('app.title') }}</h1>
+                <p class="muted">{{ t('auth.subtitle') }}</p>
+            </div>
+        </div>
+        <form class="auth-form" @submit.prevent="emailPasswordSignIn">
+            <label class="field">
+                <span class="label">{{ t('placeholders.email') }}</span>
+                <input v-model="email" type="email" :placeholder="t('placeholders.email')" autocomplete="username" required>
+            </label>
+            <label class="field">
+                <span class="label">{{ t('placeholders.password') }}</span>
+                <input v-model="password" type="password" :placeholder="t('placeholders.password')" autocomplete="current-password" required>
+            </label>
+            <p v-if="authError" class="auth-error">{{ authError }}</p>
+            <button class="btn primary" :disabled="authLoading">{{ t('actions.signIn') }}</button>
+        </form>
+    </div>
+</div>

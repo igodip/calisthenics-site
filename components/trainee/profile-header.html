@@ -1,0 +1,69 @@
+<section class="trainee-hero">
+    <div class="trainee-identity">
+        <div class="trainee-avatar">
+            {{ (current.displayName || shortId(current.id) || '?').slice(0, 1).toUpperCase() }}
+        </div>
+        <div class="stack">
+            <div class="eyebrow">{{ t('program.dataTitle') }}</div>
+            <h1>{{ current.displayName || shortId(current.id) }}</h1>
+            <div class="trainee-id mono">{{ current.id }}</div>
+        </div>
+    </div>
+    <div class="trainee-hero-metrics">
+        <div class="trainee-metric">
+            <span>{{ t('program.progressLabel') }}</span>
+            <strong>{{ progressFor(current).percent }}%</strong>
+            <small>{{ progressFor(current).completed }}/{{ progressFor(current).total }}</small>
+        </div>
+        <div class="trainee-metric">
+            <span>{{ t('labels.weight') }}</span>
+            <strong>{{ formatWeight(current.weight) }}</strong>
+            <small>{{ weightHistory?.latestLabel || t('weightHistory.empty') }}</small>
+        </div>
+        <div class="trainee-metric">
+            <span>{{ t('program.paymentStatus') }}</span>
+            <strong class="metric-status" :class="current.paid ? 'paid' : 'overdue'">
+                {{ current.paid ? t('payment.onTime') : t('payment.overdue') }}
+            </strong>
+            <small>{{ t('program.paymentsTitle') }}</small>
+        </div>
+        <div class="trainee-metric">
+            <span>{{ t('trainers.assigned') }}</span>
+            <strong>{{ current.trainers?.length || 0 }}</strong>
+            <small v-if="current.trainers && current.trainers.length">
+                {{ current.trainers.map((trainer) => trainer.name).join(', ') }}
+            </small>
+            <small v-else>{{ t('trainers.none') }}</small>
+        </div>
+    </div>
+</section>
+
+<div class="filter-row trainee-tabs" role="tablist">
+    <button
+        type="button"
+        :class="{active: currentTraineeTab==='overview'}"
+        @click="currentTraineeTab='overview'"
+        role="tab"
+        :aria-selected="currentTraineeTab==='overview' ? 'true' : 'false'"
+    >
+        {{ t('traineeTabs.overview') }}
+    </button>
+    <button
+        type="button"
+        :class="{active: currentTraineeTab==='plans'}"
+        @click="currentTraineeTab='plans'"
+        role="tab"
+        :aria-selected="currentTraineeTab==='plans' ? 'true' : 'false'"
+    >
+        {{ t('traineeTabs.plans') }}
+    </button>
+    <button
+        type="button"
+        :class="{active: currentTraineeTab==='history'}"
+        @click="currentTraineeTab='history'"
+        role="tab"
+        :aria-selected="currentTraineeTab==='history' ? 'true' : 'false'"
+    >
+        {{ t('traineeTabs.history') }}
+    </button>
+</div>

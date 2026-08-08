@@ -1,0 +1,58 @@
+<div v-if="navigationOpen" class="navigation-scrim" @click="navigationOpen=false" aria-hidden="true"></div>
+<aside class="sidebar" :class="{open: navigationOpen}">
+    <div class="sidebar-header">
+        <span class="brand-mark">C</span>
+        <div class="sidebar-brand-copy">
+            <div class="brand-title">Calisync</div>
+            <div class="muted small">{{ t('navigation.portal') }}</div>
+        </div>
+        <button class="icon-button navigation-close" type="button" @click="navigationOpen=false" :aria-label="t('navigation.closeMenu')">×</button>
+    </div>
+    <nav class="nav" :aria-label="t('navigation.mainMenu')">
+        <div class="nav-group">
+            <div class="nav-group-label">{{ t('navigation.groups.workspace') }}</div>
+            <button :class="{active: activeSection==='dashboard'}" @click="navigateToSection('dashboard')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">⌂</span><span>{{ t('sections.dashboard') }}</span></span>
+            </button>
+            <button :class="{active: activeSection==='feedback'}" @click="navigateToSection('feedback')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◇</span><span>{{ t('sections.feedback') }}</span></span>
+                <span class="nav-badge">{{ feedbackEntries.length }}</span>
+            </button>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-label">{{ t('navigation.groups.people') }}</div>
+            <button :class="{active: activeSection==='trainees'}" @click="navigateToSection('trainees')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">◎</span><span>{{ t('sections.trainees') }}</span></span>
+                <span class="nav-badge">{{ filteredUsers.length }}</span>
+            </button>
+            <button v-if="canAssignTrainers" :class="{active: activeSection==='trainers'}" @click="navigateToSection('trainers')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">△</span><span>{{ t('sections.trainers') }}</span></span>
+                <span class="nav-badge">{{ trainers.length }}</span>
+            </button>
+            <button :class="{active: activeSection==='payments'}" @click="navigateToSection('payments')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">€</span><span>{{ t('sections.payments') }}</span></span>
+            </button>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-label">{{ t('navigation.groups.library') }}</div>
+            <button :class="{active: activeSection==='exercises'}" @click="navigateToSection('exercises')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">+</span><span>{{ t('sections.exercises') }}</span></span>
+                <span class="nav-badge">{{ exercises.length }}</span>
+            </button>
+            <button :class="{active: activeSection==='terminology'}" @click="navigateToSection('terminology')">
+                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">≡</span><span>{{ t('sections.terminology') }}</span></span>
+                <span class="nav-badge">{{ terminology.length }}</span>
+            </button>
+        </div>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-chip">
+            <div class="avatar">{{ (user?.email || '?').slice(0, 1).toUpperCase() }}</div>
+            <div>
+                <div class="user-email">{{ user?.email }}</div>
+                <div class="muted small">{{ roleLabel }}</div>
+            </div>
+        </div>
+        <button class="btn ghost" @click="signOut">{{ t('actions.signOut') }}</button>
+    </div>
+</aside>

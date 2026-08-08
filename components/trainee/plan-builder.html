@@ -1,0 +1,195 @@
+<div class="section-panel active trainee-section trainee-plan-section">
+    <div class="overview-grid trainee-plan-shell">
+        <div class="card workout-builder-card">
+            <div class="workout-editor-header">
+                <div class="stack">
+                    <h3 class="workout-editor-title">{{ t('program.planBuilderTitle') }}</h3>
+                    <span class="muted small">{{ t('program.planBuilderSubtitle') }}</span>
+                </div>
+                <div class="workout-editor-header-actions">
+                    <button
+                        class="btn workout-editor-create"
+                        type="button"
+                        @click="saveTemplatePlan"
+                        :disabled="savingTemplatePlan"
+                    >
+                        <span class="workout-editor-create-icon">+</span>
+                        {{ selectedTemplatePlanId ? t('actions.save') : t('actions.createWorkout') }}
+                    </button>
+                    <span v-if="savingTemplatePlan" class="muted small">{{ t('status.savingPlan') }}</span>
+                    <span v-if="templatePlanLoading" class="muted small">{{ t('status.loadingPlan') }}</span>
+                </div>
+            </div>
+            <div class="workout-editor-settings">
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.plan') }}</span>
+                    <select v-model="selectedTemplatePlanId" :disabled="templatePlanLoading">
+                        <option value="">{{ t('placeholders.newPlan') }}</option>
+                        <option v-for="plan in plans" :key="plan.id" :value="plan.id">
+                            {{ plan.title || t('labels.untitled') }}
+                        </option>
+                    </select>
+                </label>
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.planName') }}</span>
+                    <input v-model="templatePlanName" :placeholder="t('program.planExample')" />
+                </label>
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.days') }}</span>
+                    <select v-model.number="templateDayCount">
+                        <option v-for="option in templateDayOptions" :key="option" :value="option">
+                            {{ option }}
+                        </option>
+                    </select>
+                </label>
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.weeks') }}</span>
+                    <select v-model.number="templateWeekCount">
+                        <option v-for="option in templateWeekOptions" :key="option" :value="option">
+                            {{ option }}
+                        </option>
+                    </select>
+                </label>
+                <label class="stack small">
+                    <span class="muted small">{{ t('labels.exercises') }}</span>
+                    <select v-model.number="templateSlotCount">
+                        <option v-for="option in templateExerciseOptions" :key="option" :value="option">
+                            {{ option }}
+                        </option>
+                    </select>
+                </label>
+            </div>
+            <div class="workout-import-panel">
+                <label class="stack small workout-import-field">
+                    <span class="muted small">{{ t('program.pdfImportTitle') }}</span>
+                    <input
+                        type="file"
+                        accept="application/pdf"
+                        @change="importProgramPdf"
+                        :disabled="pdfImportLoading"
+                    />
+                </label>
+                <span v-if="pdfImportLoading" class="muted small">{{ t('status.importingPdf') }}</span>
+                <span v-else-if="pdfImportError" class="muted small">{{ pdfImportError }}</span>
+                <span v-else-if="pdfImportSummary" class="muted small">{{ pdfImportSummary }}</span>
+            </div>
+            <div class="workout-editor-grid">
+                <div class="workout-editor-column">
+                    <div class="workout-card">
+                        <div class="workout-card-header">
+                            <h4>{{ t('labels.days') }}</h4>
+                            <button
+                                class="icon-button"
+                                type="button"
+                                @click="incrementTemplateDayCount"
+                                :disabled="templateDayCount >= templateDayOptions[templateDayOptions.length - 1]"
+                            >
+                                +
+                            </button>
+                        </div>
+                        <div class="workout-days">
+                            <div
+                                v-for="group in templateWeekGroups"
+                                :key="`week-${group.week}`"
+                                class="workout-week-group"
+                            >
+                                <div class="workout-week-header">
+                                    {{ t('labels.weekNumber', { week: group.week }) }}
+                                </div>
+                                <button
+                                    v-for="entry in group.days"
+                                    :key="entry.day.id"
+                                    class="workout-day-item"
+                                    :class="{ active: entry.index === selectedTemplateDay }"
+                                    type="button"
+                                    @click="selectTemplateDay(entry.index)"
+                                >
+                                    <div class="stack">
+                                        <strong>{{ templateDayLabel(entry.index) }}</strong>
+                                        <span class="muted small">
+                                            {{ entry.day.title || t('placeholders.workoutTitle') }}
+                                        </span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                        <label class="stack small workout-day-title">
+                            <span class="muted small">{{ t('labels.title') }}</span>
+                            <input v-model="activeTemplateDay.title" :placeholder="t('placeholders.workoutTitle')" />
+                        </label>
+                    </div>
+                </div>
+                <div class="workout-editor-column">
+                    <div class="workout-card">
+                        <div class="workout-card-header">
+                            <h4>{{ t('labels.activities') }}</h4>
+                            <button
+                                class="icon-button"
+                                type="button"
+                                @click="incrementTemplateSlotCount"
+                                :disabled="templateSlotCount >= templateExerciseOptions[templateExerciseOptions.length - 1]"
+                            >
+                                +
+                            </button>
+                        </div>
+                        <div class="workout-activity-list">
+                            <button
+                                v-for="(slot, slotIndex) in activeTemplateSlots"
+                                :key="`${activeTemplateDay.id}-${slotIndex}`"
+                                class="workout-activity-item"
+                                :class="{ active: slotIndex === selectedTemplateSlot }"
+                                type="button"
+                                @click="selectTemplateSlot(slotIndex)"
+                            >
+                                <div class="stack">
+                                    <strong>{{ resolveTemplateSlotName(slot) || t('placeholders.exerciseName') }}</strong>
+                                </div>
+                                <span class="workout-activity-check" :class="{ active: slotIndex === selectedTemplateSlot }">
+                                    ✓
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="workout-editor-column">
+                    <div class="workout-card workout-detail-card">
+                        <div class="workout-card-header">
+                            <h4>{{ resolveTemplateSlotName(activeTemplateSlot) || t('labels.exercise') }}</h4>
+                        </div>
+                        <div class="workout-detail-grid">
+                            <label class="stack small">
+                                <span class="muted small">{{ t('labels.exercise') }}</span>
+                                <input
+                                    v-model="activeTemplateSlot.exercise"
+                                    :placeholder="t('placeholders.exerciseName')"
+                                />
+                            </label>
+                            <label class="stack small">
+                                <span class="muted small">{{ t('labels.linkedExercise') }}</span>
+                                <select v-model="activeTemplateSlot.exercise_id">
+                                    <option value="">
+                                        {{ t('actions.none') }}
+                                    </option>
+                                    <option
+                                        v-for="exercise in exercises"
+                                        :key="exercise.id"
+                                        :value="exercise.id"
+                                    >
+                                        {{ exercise.name || exercise.slug || exercise.id }}
+                                    </option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="stack small">
+                            <span class="muted small">{{ t('labels.notes') }}</span>
+                            <textarea
+                                v-model="activeTemplateSlot.notes"
+                                :placeholder="t('placeholders.notesOptional')"
+                            ></textarea>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

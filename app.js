@@ -4,6 +4,7 @@ import {
   getSupabaseLoadMessage,
 } from './supabase-client.js';
 import { createI18n, languageOptions } from './i18n.js';
+import { registerPortalComponents } from './components/component-loader.js';
 import {
   dayCodeOptions,
   planStatuses,
@@ -34,8 +35,8 @@ function showToast(message, type = 'error', duration = 5000) {
   }
 }
 
-(() => {
-  const { createApp, ref, computed, onMounted, watch } = Vue;
+void (async () => {
+  const { createApp, ref, computed, onMounted, watch, provide } = Vue;
 
   const fallbackLocale = getBrowserLocale();
   const { supabase, error } = createSupabaseClient();
@@ -45,7 +46,7 @@ function showToast(message, type = 'error', duration = 5000) {
     return;
   }
 
-  createApp({
+  const app = createApp({
     setup() {
       const storedLocale = localStorage.getItem('adminLocale');
       const storedTheme = localStorage.getItem('adminTheme');
@@ -4799,7 +4800,7 @@ function showToast(message, type = 'error', duration = 5000) {
         });
       });
 
-      return {
+      const portal = {
         session,
         user,
         theme,
@@ -5062,6 +5063,12 @@ function showToast(message, type = 'error', duration = 5000) {
         markPaymentPaid,
         formatDifficultyLabel,
       };
+      provide('portal', portal);
+      return portal;
     },
-  }).mount('#app');
+  });
+  await registerPortalComponents(app, {
+    isTraineeDetailPage: window.location.pathname.includes('/trainee.html'),
+  });
+  app.mount('#app');
 })();
