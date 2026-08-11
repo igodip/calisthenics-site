@@ -286,7 +286,16 @@ export const translations = {
     },
     trainees: {
       badge: 'trainee',
+      createEyebrow: 'Quick setup',
+      createTitle: 'Add a trainee',
       createSubtitle: 'Add a new trainee record directly from admin.',
+      directoryTitle: 'Trainee directory',
+      directorySubtitle: 'Review progress, coaching assignments, and app access.',
+      progressTitle: 'Workout progress',
+      appAccessTitle: 'Trainee app access',
+      appAccessActive: 'Active — current month paid',
+      appAccessBlocked: 'Blocked — current month unpaid',
+      appAccessToggle: 'Allow app access',
       detailSubtitle: 'Detailed view for the selected trainee.',
       detailNotFound: 'No trainee found for this page.',
       namePlaceholder: 'Full name',
@@ -316,7 +325,7 @@ export const translations = {
     payment: {
       onTime: 'Payments on time',
       overdue: 'Payment overdue',
-      toggle: 'On time',
+      toggle: 'App access',
       amountLabel: 'Amount {amount}',
     },
     status: {
@@ -787,7 +796,16 @@ export const translations = {
     },
     trainees: {
       badge: 'allievo',
+      createEyebrow: 'Configurazione rapida',
+      createTitle: 'Aggiungi un allievo',
       createSubtitle: 'Aggiungi un nuovo allievo direttamente da admin.',
+      directoryTitle: 'Elenco allievi',
+      directorySubtitle: 'Controlla progressi, trainer assegnati e accesso all’app.',
+      progressTitle: 'Progresso workout',
+      appAccessTitle: 'Accesso app allievo',
+      appAccessActive: 'Attivo — mese corrente pagato',
+      appAccessBlocked: 'Bloccato — mese corrente non pagato',
+      appAccessToggle: 'Consenti accesso all’app',
       detailSubtitle: 'Vista dettagliata dell’allievo selezionato.',
       detailNotFound: 'Nessun allievo trovato per questa pagina.',
       namePlaceholder: 'Nome e cognome',
@@ -817,7 +835,7 @@ export const translations = {
     payment: {
       onTime: 'Pagamenti in regola',
       overdue: 'Pagamento in ritardo',
-      toggle: 'App attiva',
+      toggle: 'Accesso app',
       amountLabel: 'Importo {amount}',
     },
     status: {
