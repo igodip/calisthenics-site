@@ -1442,7 +1442,15 @@ void (async () => {
       };
 
       const formatImportedProgramming = (columns) => {
-        const labels = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4', 'Scarico', 'Rec/Som'];
+        const labels = [
+          'Sett 1',
+          'Sett 2',
+          'Sett 3',
+          'Sett 4',
+          'Sett 5',
+          'Scarico',
+          'Rec/Som',
+        ];
         return labels
           .map((label) => {
             const value = normalizePdfText(columns[label]);
@@ -1452,8 +1460,15 @@ void (async () => {
           .join('\n');
       };
 
-      const importedWeekColumns = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4', 'Scarico'];
-      const tableColumnLabels = [
+      const importedWeekColumns = [
+        'Sett 1',
+        'Sett 2',
+        'Sett 3',
+        'Sett 4',
+        'Sett 5',
+        'Scarico',
+      ];
+      const legacyTableColumnLabels = [
         'exercise',
         'notes',
         'Sett 1',
@@ -1463,6 +1478,17 @@ void (async () => {
         'Scarico',
         'Rec/Som',
       ];
+
+      const normalizePdfColumnLabel = (value) => {
+        const text = normalizePdfText(value).toLowerCase();
+        if (/esercizi?/.test(text)) return 'exercise';
+        if (/^notes?$/.test(text)) return 'notes';
+        const weekMatch = text.match(/sett(?:imana)?\s*([1-9])/i);
+        if (weekMatch) return `Sett ${weekMatch[1]}`;
+        if (/scarico/.test(text)) return 'Scarico';
+        if (/rec\s*\/\s*som/.test(text)) return 'Rec/Som';
+        return null;
+      };
 
       const renderPdfPageImage = async (page) => {
         const scale = 2;
@@ -1570,15 +1596,18 @@ void (async () => {
         const rows = buildPdfRows(textContent.items, viewport.height);
         const dayTitleRow = rows.find((row) => /giorno\s+[a-g]/i.test(row.text));
         if (!dayTitleRow) {
-          throw new Error('Missing day title in PDF page.');
+          throw new Error(t('errors.pdfImportFailed'));
         }
         const dayMatch = dayTitleRow.text.match(/giorno\s+([a-g])/i);
         const dayCode = (dayMatch?.[1] || '').toUpperCase();
-        const headerItems = normalizedItems.filter((item) =>
-          /esercizi|note|sett\s*[1-4]|scarico|rec\/som/i.test(item.text),
+        const headerRow = rows.find(
+          (row) => /esercizi/i.test(row.text) && /sett|note|scarico/i.test(row.text),
         );
-        const headerBottom = headerItems.length
-          ? Math.max(...headerItems.map((item) => item.y)) + 10
+        const headerItems = headerRow
+          ? normalizedItems.filter((item) => Math.abs(item.y - headerRow.y) <= 4)
+          : [];
+        const headerBottom = headerRow
+          ? headerRow.y + 10
           : dayTitleRow.y + 48;
         const pageImage = await renderPdfPageImage(page);
         const horizontalLines = detectTableHorizontalLines(pageImage);
@@ -1588,12 +1617,12 @@ void (async () => {
         if (!tableLines.length || tableLines[0] - headerBottom > 8) {
           tableLines.unshift(headerBottom);
         }
-        const bands = [];
+        const horizontalBands = [];
         for (let index = 0; index < tableLines.length - 1; index += 1) {
           const top = tableLines[index];
           const bottom = tableLines[index + 1];
           if (bottom - top < 8) continue;
-          bands.push({ top, bottom });
+          horizontalBands.push({ top, bottom });
         }
         const verticalLines = tableLines.length
           ? detectTableVerticalLines(
@@ -1614,11 +1643,73 @@ void (async () => {
           verticalLines.unshift(leftBoundary);
         }
         if (
-          verticalLines.length < tableColumnLabels.length + 1 ||
+          verticalLines.length < 2 ||
           rightBoundary - verticalLines[verticalLines.length - 1] > 12
         ) {
           verticalLines.push(rightBoundary);
         }
+
+        const detectedColumnLabels = [];
+        for (let index = 0; index < verticalLines.length - 1; index += 1) {
+          const headerText = headerItems
+            .filter(
+              (item) =>
+                item.x >= verticalLines[index] && item.x < verticalLines[index + 1],
+            )
+            .sort((a, b) => a.x - b.x)
+            .map((item) => item.text)
+            .join(' ');
+          detectedColumnLabels.push(normalizePdfColumnLabel(headerText));
+        }
+        const hasDetectedLayout =
+          detectedColumnLabels.includes('exercise') &&
+          detectedColumnLabels.some((label) => /^Sett\s\d$/.test(label || ''));
+        const columnLabels = hasDetectedLayout
+          ? detectedColumnLabels
+          : legacyTableColumnLabels;
+        const weekLabels = columnLabels.filter(
+          (label) => /^Sett\s\d$/.test(label || '') || label === 'Scarico',
+        );
+
+        const exerciseColumnIndex = columnLabels.indexOf('exercise');
+        const exerciseItems =
+          exerciseColumnIndex >= 0
+            ? normalizedItems
+                .filter(
+                  (item) =>
+                    item.y > headerBottom &&
+                    item.x >= verticalLines[exerciseColumnIndex] &&
+                    item.x < verticalLines[exerciseColumnIndex + 1],
+                )
+                .sort((a, b) => a.y - b.y || a.x - b.x)
+            : [];
+        const exerciseRows = buildPdfRows(
+          exerciseItems.map((item) => ({
+            str: item.text,
+            transform: [1, 0, 0, 1, item.x, viewport.height - item.y],
+          })),
+          viewport.height,
+        );
+        const exerciseGroups = [];
+        exerciseRows.forEach((row) => {
+          const previous = exerciseGroups[exerciseGroups.length - 1];
+          if (previous && row.y - previous.maxY <= 24) {
+            previous.rows.push(row);
+            previous.maxY = row.y;
+            return;
+          }
+          exerciseGroups.push({ rows: [row], minY: row.y, maxY: row.y });
+        });
+        const lastTableLine = tableLines[tableLines.length - 1] || viewport.height;
+        const exerciseBands = exerciseGroups.map((group, index) => {
+          const previous = exerciseGroups[index - 1];
+          const next = exerciseGroups[index + 1];
+          return {
+            top: previous ? (previous.maxY + group.minY) / 2 : headerBottom,
+            bottom: next ? (group.maxY + next.minY) / 2 : lastTableLine,
+          };
+        });
+        const bands = exerciseBands.length ? exerciseBands : horizontalBands;
 
         const entries = bands.map((band) => {
           const bandItems = normalizedItems.filter(
@@ -1634,14 +1725,11 @@ void (async () => {
           }
           const exerciseLines = [];
           const noteLines = [];
-          const programmingColumns = {
-            'Sett 1': '',
-            'Sett 2': '',
-            'Sett 3': '',
-            'Sett 4': '',
-            Scarico: '',
-            'Rec/Som': '',
-          };
+          const programmingColumns = Object.fromEntries(
+            [...new Set(importedWeekColumns.concat(weekLabels, 'Rec/Som'))].map(
+              (label) => [label, ''],
+            ),
+          );
           const bandRows = buildPdfRows(
             bandItems.map((item) => ({
               str: item.text,
@@ -1659,7 +1747,7 @@ void (async () => {
                   break;
                 }
               }
-              const label = tableColumnLabels[columnIndex] || null;
+              const label = columnLabels[columnIndex] || null;
               if (!label) return;
               columnValues[label] = columnValues[label]
                 ? `${columnValues[label]} ${item.text}`.trim()
@@ -1673,7 +1761,7 @@ void (async () => {
             if (middle) {
               noteLines.push(middle);
             }
-            importedWeekColumns.concat('Rec/Som').forEach((label) => {
+            weekLabels.concat('Rec/Som').forEach((label) => {
               const value = normalizePdfText(columnValues[label]);
               if (!value) return;
               const currentValue = programmingColumns[label];
@@ -1708,9 +1796,14 @@ void (async () => {
         return {
           dayCode,
           title: `GIORNO ${dayCode}`,
+          weekLabels,
           slots: entries.filter(Boolean),
         };
       };
+
+      if (new URLSearchParams(window.location.search).has('pdf-import-test')) {
+        window.__CALISYNC_PDF_IMPORTER__ = { parseProgramPdfPage };
+      }
 
       async function importProgramPdf(event) {
         const input = event?.target;
@@ -1720,6 +1813,7 @@ void (async () => {
         if (!file) return;
         if (!window.pdfjsLib?.getDocument) {
           pdfImportError.value = t('errors.pdfImportUnavailable');
+          showToast(pdfImportError.value);
           input.value = '';
           return;
         }
@@ -1748,19 +1842,21 @@ void (async () => {
           if (!sortedDays.length) {
             throw new Error(t('errors.pdfImportFailed'));
           }
-          const weekCount = Math.max(
-            1,
-            ...sortedDays.map((day) =>
-              (day.slots || []).reduce((maxWeeks, slot) => {
-                const slotWeeks = importedWeekColumns.reduce(
-                  (count, label, index) =>
-                    normalizePdfText(slot.programmingColumns?.[label]) ? index + 1 : count,
-                  0,
-                );
-                return Math.max(maxWeeks, slotWeeks);
-              }, 0),
-            ),
+          const importWeekLabels = sortedDays.reduce(
+            (best, day) =>
+              (day.weekLabels || []).length > best.length ? day.weekLabels : best,
+            [],
           );
+          const weekColumns = importWeekLabels.length
+            ? importWeekLabels
+            : importedWeekColumns.filter((label) =>
+                sortedDays.some((day) =>
+                  (day.slots || []).some((slot) =>
+                    normalizePdfText(slot.programmingColumns?.[label]),
+                  ),
+                ),
+              );
+          const weekCount = Math.max(1, weekColumns.length);
           const maxSlots = Math.max(
             1,
             ...sortedDays.map((day) => (day.slots || []).length || 0),
@@ -1780,10 +1876,11 @@ void (async () => {
                 slots: nextDays[targetIndex].slots.map((slot, slotIndex) => {
                   const importedSlot = day.slots[slotIndex];
                   if (!importedSlot) return slot;
-                  const weekLabel = importedWeekColumns[weekIndex];
+                  const weekLabel = weekColumns[weekIndex];
                   const weekValue = normalizePdfText(
                     importedSlot.programmingColumns?.[weekLabel],
                   );
+                  if (!weekValue) return slot;
                   const recSom = normalizePdfText(
                     importedSlot.programmingColumns?.['Rec/Som'],
                   );
@@ -1822,7 +1919,16 @@ void (async () => {
             templatePlanName.value = file.name.replace(/\.pdf$/i, '');
           }
           const exerciseCount = sortedDays.reduce(
-            (sum, day) => sum + (day.slots || []).length * weekCount,
+            (sum, day) =>
+              sum +
+              (day.slots || []).reduce(
+                (slotTotal, slot) =>
+                  slotTotal +
+                  weekColumns.filter((label) =>
+                    normalizePdfText(slot.programmingColumns?.[label]),
+                  ).length,
+                0,
+              ),
             0,
           );
           pdfImportSummary.value = t('program.pdfImportSummary', {
@@ -1832,6 +1938,7 @@ void (async () => {
         } catch (err) {
           console.error(err);
           pdfImportError.value = err.message || t('errors.pdfImportFailed');
+          showToast(pdfImportError.value);
         } finally {
           templatePlanLoading.value = false;
           pdfImportLoading.value = false;
