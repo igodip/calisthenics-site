@@ -8,7 +8,8 @@
 
 ## Current Requirements
 - Admins can authenticate with Supabase email/password.
-- Admins can manage trainees (CRUD), plans, workout days, exercises, terminology, feedback, payments, max tests, weight logs, and dashboard views.
+- Admins can manage trainees (CRUD), plans, workout days, prescribed workout entries, feedback, payments, max tests, weight logs, and dashboard views.
+- The exercise catalogue and terminology are not exposed as portal sections or editable browser data. They remain developer-managed directly in the database; frontend exercise reads are limited to internal plan/import reference resolution.
 - Trainers can access trainer-specific workflow such as coach tips, trainer notes, assigned trainees, and trainee feedback constrained by RLS.
 - Admins with `admins.can_assign_trainers = true` can assign and unassign trainers from trainees.
 - Admins with `admins.can_assign_trainers = true` also need a dedicated trainer-management area to:

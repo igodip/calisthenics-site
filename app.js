@@ -74,7 +74,6 @@ void (async () => {
         updateDocumentLanguage();
         if (session.value) {
           if (!isTraineeDetailPage) {
-            await loadTerminology();
             await loadDashboardNotes();
           }
           if (feedbackEntries.value.length || isTraineeDetailPage) {
@@ -100,8 +99,6 @@ void (async () => {
         'trainees',
         'trainers',
         'payments',
-        'exercises',
-        'terminology',
       ];
       const requestedSection = window.location.hash.replace('#', '');
       const activeSection = ref(
@@ -128,31 +125,8 @@ void (async () => {
       const loadingTrainers = ref(false);
       const trainerDirectoryError = ref('');
       const exercises = ref([]);
-      const exerciseFilter = ref('');
-      const exerciseForm = ref({
-        name: '',
-        slug: '',
-        difficulty: 'beginner',
-        sort_order: 1,
-      });
-      const exerciseEdits = ref({});
-      const exerciseSaving = ref({});
-      const creatingExercise = ref(false);
       const loadingExercises = ref(false);
       const exercisesError = ref('');
-      const terminology = ref([]);
-      const terminologyFilter = ref('');
-      const terminologyForm = ref({
-        term_key: '',
-        title: '',
-        description: '',
-        sort_order: 1,
-      });
-      const terminologyEdits = ref({});
-      const terminologySaving = ref({});
-      const creatingTerminology = ref(false);
-      const loadingTerminology = ref(false);
-      const terminologyError = ref('');
 
       const users = ref([]);
       const traineeForm = ref({
@@ -321,10 +295,6 @@ void (async () => {
         await loadTemplatePlan(nextId);
       });
       watch(activeSection, async (nextSection) => {
-        if (nextSection === 'exercises') {
-          if (exercisesContext.value === 'all' || loadingExercises.value) return;
-          await loadExercises(null);
-        }
         if (nextSection === 'feedback') {
           if (feedbackLoading.value || feedbackEntries.value.length) return;
           await loadFeedbackEntries();
@@ -541,43 +511,6 @@ void (async () => {
       );
 
       const showLastWeekCard = computed(() => Boolean(currentTrainer.value));
-      const exerciseDifficultyOptions = [
-        'beginner',
-        'intermediate',
-        'advanced',
-      ];
-
-      const filteredExercises = computed(() => {
-        const query = (exerciseFilter.value || '').trim().toLowerCase();
-        const list = exercises.value || [];
-        if (!query) return list;
-        return list.filter((exercise) => {
-          const name = (exercise.name || '').toLowerCase();
-          const slug = (exercise.slug || '').toLowerCase();
-          const difficulty = (exercise.difficulty || '').toLowerCase();
-          return (
-            name.includes(query) ||
-            slug.includes(query) ||
-            difficulty.includes(query)
-          );
-        });
-      });
-      const filteredTerminology = computed(() => {
-        const query = (terminologyFilter.value || '').trim().toLowerCase();
-        const list = terminology.value || [];
-        if (!query) return list;
-        return list.filter((entry) => {
-          const key = (entry.term_key || '').toLowerCase();
-          const title = (entry.title || '').toLowerCase();
-          const description = (entry.description || '').toLowerCase();
-          return (
-            key.includes(query) ||
-            title.includes(query) ||
-            description.includes(query)
-          );
-        });
-      });
-
       const activeTemplateDay = computed(
         () =>
           programTemplateDays.value[selectedTemplateDay.value] ||
@@ -2312,7 +2245,6 @@ void (async () => {
           }
         } else {
           await loadPaymentTrends();
-          await loadTerminology();
           await loadTraineeProgress();
           await loadDashboardBurndown();
           await loadDashboardNotes();
@@ -2573,19 +2505,6 @@ void (async () => {
         }
       }
 
-      function setExerciseEdit(exercise) {
-        if (!exercise?.id) return;
-        exerciseEdits.value = {
-          ...exerciseEdits.value,
-          [exercise.id]: {
-            name: exercise.name || '',
-            slug: exercise.slug || '',
-            difficulty: exercise.difficulty || 'beginner',
-            sort_order: Number(exercise.sort_order ?? 1),
-          },
-        };
-      }
-
       function normalizeExerciseSlug(value) {
         return (value || '')
           .toLowerCase()
@@ -2667,41 +2586,6 @@ void (async () => {
         return resolveExerciseReferenceFromList(value, exercises.value || []);
       }
 
-      function formatDifficultyLabel(value) {
-        const text = (value || '').trim();
-        if (!text) return '';
-        return text.charAt(0).toUpperCase() + text.slice(1);
-      }
-
-      function resetExerciseForm() {
-        exerciseForm.value = {
-          name: '',
-          slug: '',
-          difficulty: 'beginner',
-          sort_order: 1,
-        };
-      }
-      function setTerminologyEdit(entry) {
-        if (!entry?.id) return;
-        terminologyEdits.value = {
-          ...terminologyEdits.value,
-          [entry.id]: {
-            term_key: entry.term_key || '',
-            title: entry.title || '',
-            description: entry.description || '',
-            sort_order: Number(entry.sort_order ?? 1),
-          },
-        };
-      }
-      function resetTerminologyForm() {
-        terminologyForm.value = {
-          term_key: '',
-          title: '',
-          description: '',
-          sort_order: 1,
-        };
-      }
-
       async function loadExercises(u = current.value) {
         loadingExercises.value = true;
         exercisesError.value = '';
@@ -2754,8 +2638,6 @@ void (async () => {
             exercises.value = data || [];
           }
           exercisesContext.value = context;
-          exerciseEdits.value = {};
-          (exercises.value || []).forEach(setExerciseEdit);
         } catch (error) {
           console.error(error);
           exercises.value = [];
@@ -2763,263 +2645,6 @@ void (async () => {
           exercisesError.value = error.message || t('errors.loadExercises');
         } finally {
           loadingExercises.value = false;
-        }
-      }
-      async function loadTerminology() {
-        loadingTerminology.value = true;
-        terminologyError.value = '';
-        try {
-          const { data, error } = await supabase
-            .from('terminology')
-            .select('id, term_key, locale, title, description, sort_order, created_at')
-            .eq('locale', locale.value)
-            .order('sort_order', { ascending: true })
-            .order('title', { ascending: true });
-          if (error) {
-            throw new Error(t('errors.loadTerminology', { message: error.message }));
-          }
-          terminology.value = data || [];
-          terminologyEdits.value = {};
-          (terminology.value || []).forEach(setTerminologyEdit);
-        } catch (error) {
-          console.error(error);
-          terminology.value = [];
-          terminologyError.value = error.message || t('errors.loadTerminology');
-        } finally {
-          loadingTerminology.value = false;
-        }
-      }
-
-      async function createExercise() {
-        if (creatingExercise.value) return;
-        const name = (exerciseForm.value.name || '').trim();
-        if (!name) {
-          showToast(t('errors.exerciseNameRequired'));
-          return;
-        }
-        const slugInput = (exerciseForm.value.slug || '').trim();
-        const slug = slugInput || normalizeExerciseSlug(name);
-        if (!slug) {
-          showToast(t('errors.exerciseNameRequired'));
-          return;
-        }
-        const difficulty =
-          (exerciseForm.value.difficulty || '').trim() || 'beginner';
-        const sortOrder = Number(exerciseForm.value.sort_order || 1);
-        creatingExercise.value = true;
-        try {
-          const { error } = await supabase.from('exercises').insert({
-            name,
-            slug,
-            difficulty,
-            sort_order: Number.isFinite(sortOrder) ? sortOrder : 1,
-          });
-          if (error) {
-            throw new Error('Create exercise failed: ' + error.message);
-          }
-          resetExerciseForm();
-          await loadExercises();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.createExercise'));
-        } finally {
-          creatingExercise.value = false;
-        }
-      }
-      async function createTerminology() {
-        if (creatingTerminology.value) return;
-        const termKey = (terminologyForm.value.term_key || '').trim();
-        if (!termKey) {
-          showToast(t('errors.terminologyKeyRequired'));
-          return;
-        }
-        const title = (terminologyForm.value.title || '').trim();
-        if (!title) {
-          showToast(t('errors.terminologyTitleRequired'));
-          return;
-        }
-        const description = (terminologyForm.value.description || '').trim();
-        if (!description) {
-          showToast(t('errors.terminologyDescriptionRequired'));
-          return;
-        }
-        const sortOrder = Number(terminologyForm.value.sort_order || 1);
-        creatingTerminology.value = true;
-        try {
-          const { error } = await supabase.from('terminology').insert({
-            term_key: termKey,
-            locale: locale.value,
-            title,
-            description,
-            sort_order: Number.isFinite(sortOrder) ? sortOrder : 1,
-          });
-          if (error) {
-            throw new Error('Create terminology failed: ' + error.message);
-          }
-          resetTerminologyForm();
-          await loadTerminology();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.createTerminology'));
-        } finally {
-          creatingTerminology.value = false;
-        }
-      }
-
-      async function saveExercise(exercise) {
-        if (!exercise?.id) return;
-        if (exerciseSaving.value[exercise.id]) return;
-        const form = exerciseEdits.value[exercise.id] || {};
-        const name = (form.name || '').trim();
-        if (!name) {
-          showToast(t('errors.exerciseNameRequired'));
-          return;
-        }
-        const slugInput = (form.slug || '').trim();
-        const slug = slugInput || normalizeExerciseSlug(name);
-        if (!slug) {
-          showToast(t('errors.exerciseNameRequired'));
-          return;
-        }
-        const difficulty = (form.difficulty || '').trim() || 'beginner';
-        const sortOrder = Number(form.sort_order || 1);
-        exerciseSaving.value = {
-          ...exerciseSaving.value,
-          [exercise.id]: true,
-        };
-        try {
-          const { error } = await supabase
-            .from('exercises')
-            .update({
-              name,
-              slug,
-              difficulty,
-              sort_order: Number.isFinite(sortOrder) ? sortOrder : 1,
-            })
-            .eq('id', exercise.id);
-          if (error) {
-            throw new Error('Update exercise failed: ' + error.message);
-          }
-          await loadExercises();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.updateExercise'));
-        } finally {
-          exerciseSaving.value = {
-            ...exerciseSaving.value,
-            [exercise.id]: false,
-          };
-        }
-      }
-      async function saveTerminology(entry) {
-        if (!entry?.id) return;
-        if (terminologySaving.value[entry.id]) return;
-        const form = terminologyEdits.value[entry.id] || {};
-        const termKey = (form.term_key || '').trim();
-        if (!termKey) {
-          showToast(t('errors.terminologyKeyRequired'));
-          return;
-        }
-        const title = (form.title || '').trim();
-        if (!title) {
-          showToast(t('errors.terminologyTitleRequired'));
-          return;
-        }
-        const description = (form.description || '').trim();
-        if (!description) {
-          showToast(t('errors.terminologyDescriptionRequired'));
-          return;
-        }
-        const sortOrder = Number(form.sort_order || 1);
-        terminologySaving.value = {
-          ...terminologySaving.value,
-          [entry.id]: true,
-        };
-        try {
-          const { error } = await supabase
-            .from('terminology')
-            .update({
-              term_key: termKey,
-              title,
-              description,
-              sort_order: Number.isFinite(sortOrder) ? sortOrder : 1,
-            })
-            .eq('id', entry.id);
-          if (error) {
-            throw new Error('Update terminology failed: ' + error.message);
-          }
-          await loadTerminology();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.updateTerminology'));
-        } finally {
-          terminologySaving.value = {
-            ...terminologySaving.value,
-            [entry.id]: false,
-          };
-        }
-      }
-
-      async function deleteExercise(exercise) {
-        if (!exercise?.id) return;
-        const confirmed = confirm(
-          t('confirm.deleteExercise', {
-            name: exercise.name || exercise.slug || exercise.id,
-          }),
-        );
-        if (!confirmed) return;
-        exerciseSaving.value = {
-          ...exerciseSaving.value,
-          [exercise.id]: true,
-        };
-        try {
-          const { error } = await supabase
-            .from('exercises')
-            .delete()
-            .eq('id', exercise.id);
-          if (error) {
-            throw new Error('Delete exercise failed: ' + error.message);
-          }
-          await loadExercises();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.deleteExercise'));
-        } finally {
-          exerciseSaving.value = {
-            ...exerciseSaving.value,
-            [exercise.id]: false,
-          };
-        }
-      }
-      async function deleteTerminology(entry) {
-        if (!entry?.id) return;
-        const confirmed = confirm(
-          t('confirm.deleteTerminology', {
-            name: entry.title || entry.term_key || entry.id,
-          }),
-        );
-        if (!confirmed) return;
-        terminologySaving.value = {
-          ...terminologySaving.value,
-          [entry.id]: true,
-        };
-        try {
-          const { error } = await supabase
-            .from('terminology')
-            .delete()
-            .eq('id', entry.id);
-          if (error) {
-            throw new Error('Delete terminology failed: ' + error.message);
-          }
-          await loadTerminology();
-        } catch (error) {
-          console.error(error);
-          showToast(error.message || t('errors.deleteTerminology'));
-        } finally {
-          terminologySaving.value = {
-            ...terminologySaving.value,
-            [entry.id]: false,
-          };
         }
       }
 
@@ -4964,25 +4589,6 @@ void (async () => {
         currentCalendarExpanded,
         currentTrainer,
         days,
-        exercises,
-        exerciseFilter,
-        exerciseForm,
-        exerciseEdits,
-        exerciseDifficultyOptions,
-        filteredExercises,
-        loadingExercises,
-        exercisesError,
-        creatingExercise,
-        exerciseSaving,
-        terminology,
-        terminologyFilter,
-        terminologyForm,
-        terminologyEdits,
-        filteredTerminology,
-        loadingTerminology,
-        terminologyError,
-        creatingTerminology,
-        terminologySaving,
         maxTests,
         maxTestHistory,
         weightLogs,
@@ -5139,16 +4745,6 @@ void (async () => {
         saveTrainerNotes,
         assignTrainerToTrainee,
         removeTrainerAssignment,
-        loadExercises,
-        createExercise,
-        resetExerciseForm,
-        saveExercise,
-        deleteExercise,
-        loadTerminology,
-        createTerminology,
-        resetTerminologyForm,
-        saveTerminology,
-        deleteTerminology,
         toggleDay,
         isDayOpen,
         jumpToDay,
@@ -5168,7 +4764,6 @@ void (async () => {
         togglePaymentCard,
         togglePayment,
         markPaymentPaid,
-        formatDifficultyLabel,
       };
       provide('portal', portal);
       return portal;

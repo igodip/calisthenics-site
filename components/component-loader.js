@@ -10,8 +10,6 @@ const adminComponents = {
   'trainees-section': './components/admin/trainees-section.html',
   'trainers-section': './components/admin/trainers-section.html',
   'payments-section': './components/admin/payments-section.html',
-  'exercises-section': './components/admin/exercises-section.html',
-  'terminology-section': './components/admin/terminology-section.html',
 };
 
 const traineeComponents = {

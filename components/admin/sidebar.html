@@ -33,17 +33,6 @@
                 <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">€</span><span>{{ t('sections.payments') }}</span></span>
             </button>
         </div>
-        <div class="nav-group">
-            <div class="nav-group-label">{{ t('navigation.groups.library') }}</div>
-            <button :class="{active: activeSection==='exercises'}" @click="navigateToSection('exercises')">
-                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">+</span><span>{{ t('sections.exercises') }}</span></span>
-                <span class="nav-badge">{{ exercises.length }}</span>
-            </button>
-            <button :class="{active: activeSection==='terminology'}" @click="navigateToSection('terminology')">
-                <span class="nav-item-main"><span class="nav-icon" aria-hidden="true">≡</span><span>{{ t('sections.terminology') }}</span></span>
-                <span class="nav-badge">{{ terminology.length }}</span>
-            </button>
-        </div>
     </nav>
     <div class="sidebar-footer">
         <div class="user-chip">

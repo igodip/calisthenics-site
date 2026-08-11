@@ -156,30 +156,13 @@
                         <div class="workout-card-header">
                             <h4>{{ resolveTemplateSlotName(activeTemplateSlot) || t('labels.exercise') }}</h4>
                         </div>
-                        <div class="workout-detail-grid">
-                            <label class="stack small">
-                                <span class="muted small">{{ t('labels.exercise') }}</span>
-                                <input
-                                    v-model="activeTemplateSlot.exercise"
-                                    :placeholder="t('placeholders.exerciseName')"
-                                />
-                            </label>
-                            <label class="stack small">
-                                <span class="muted small">{{ t('labels.linkedExercise') }}</span>
-                                <select v-model="activeTemplateSlot.exercise_id">
-                                    <option value="">
-                                        {{ t('actions.none') }}
-                                    </option>
-                                    <option
-                                        v-for="exercise in exercises"
-                                        :key="exercise.id"
-                                        :value="exercise.id"
-                                    >
-                                        {{ exercise.name || exercise.slug || exercise.id }}
-                                    </option>
-                                </select>
-                            </label>
-                        </div>
+                        <label class="stack small">
+                            <span class="muted small">{{ t('labels.exercise') }}</span>
+                            <input
+                                v-model="activeTemplateSlot.exercise"
+                                :placeholder="t('placeholders.exerciseName')"
+                            />
+                        </label>
                         <label class="stack small">
                             <span class="muted small">{{ t('labels.notes') }}</span>
                             <textarea

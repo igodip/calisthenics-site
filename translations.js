@@ -5,7 +5,7 @@ export const translations = {
     },
     auth: {
       subtitle:
-        'Sign in with your Supabase account to manage trainees, their workout days, and exercises.',
+        'Sign in with your Supabase account to manage trainees and their workout plans.',
     },
     toolbar: {
       language: 'Language',
@@ -505,7 +505,7 @@ export const translations = {
     },
     auth: {
       subtitle:
-        'Accedi con il tuo account Supabase per gestire gli allievi, le loro giornate di allenamento e gli esercizi.',
+        'Accedi con il tuo account Supabase per gestire gli allievi e i loro piani di allenamento.',
     },
     toolbar: {
       language: 'Lingua',
